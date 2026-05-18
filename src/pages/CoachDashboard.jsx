@@ -704,9 +704,9 @@ export default function CoachDashboard({ profile }) {
 
         {/* ════════════ FILM TAB ════════════ */}
         {activeTab === 'film' && (
-          <div style={{display:'flex',gap:'14px',alignItems:'flex-start',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:'14px',alignItems:'flex-start'}}>
             {/* Video */}
-            <div style={{flex:1,minWidth:'280px'}}>
+            <div style={{flex:1,minWidth:0,maxWidth:'calc(100% - 330px)'}}>
               {!videoLoaded
                 ? <div style={{background:C.panel,border:`2px dashed rgba(123,16,32,0.5)`,borderRadius:'10px',padding:'48px',textAlign:'center',cursor:'pointer'}} onClick={()=>document.getElementById('film-input').click()}>
                     <div style={{fontSize:'36px',marginBottom:'12px'}}>🎬</div>
@@ -718,7 +718,7 @@ export default function CoachDashboard({ profile }) {
               <input id="film-input" type="file" accept="video/*" style={{display:'none'}} onChange={handleVideoFile}/>
               {videoURL && (
                 <div>
-                  <video ref={videoRef} src={videoURL} style={{width:'100%',borderRadius:'10px',background:'#000'}} controls/>
+                  <video ref={videoRef} src={videoURL} style={{width:'100%',maxHeight:'480px',borderRadius:'10px',background:'#000',objectFit:'contain'}} controls/>
                   <div style={{display:'flex',gap:'8px',marginTop:'10px',flexWrap:'wrap'}}>
                     <button onClick={()=>document.getElementById('film-input').click()} style={{background:'rgba(232,130,10,0.12)',border:`1px solid rgba(232,130,10,0.35)`,borderRadius:'7px',color:C.orange2,fontFamily:'Georgia,serif',fontSize:'10px',padding:'8px 14px',cursor:'pointer',letterSpacing:'1px'}}>📂 Load Film</button>
                     <select onChange={e=>{ if(videoRef.current) videoRef.current.playbackRate=parseFloat(e.target.value) }} style={{background:C.panel,border:`1px solid ${C.border2}`,borderRadius:'7px',color:C.cream,fontFamily:'Georgia,serif',fontSize:'10px',padding:'8px 10px',outline:'none'}}>
