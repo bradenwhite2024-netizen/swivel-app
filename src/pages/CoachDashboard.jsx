@@ -384,7 +384,7 @@ export default function CoachDashboard({ profile }) {
     const evts = (data||[]).map(e => ({
       ...e,
       stat: STAT_MAP[e.event_type] || null,
-      videoTime: e.video_time ?? null,
+      videoTime: e.timestamp_sec ?? null,
     }))
     setEvents(evts)
     const sEvts = evts.filter(e=>e.stat && e.player_id)
