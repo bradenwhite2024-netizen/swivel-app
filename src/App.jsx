@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 import Login from './pages/Login'
 import CoachDashboard from './pages/CoachDashboard'
 import PlayerDashboard from './pages/PlayerDashboard'
+import AdminTracker from './pages/AdminTracker'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -33,15 +34,21 @@ function App() {
     setLoading(false)
   }
 
-  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontFamily:'sans-serif'}}>Loading...</div>
+  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontFamily:'sans-serif',background:'#0a0a0f',color:'#F5A030'}}>Loading...</div>
 
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/dashboard" />} />
+        <Route path="/admin" element={
+          !session ? <Navigate to="/login" /> :
+          profile?.role === 'admin' ? <AdminTracker profile={profile} /> :
+          <Navigate to="/dashboard" />
+        } />
         <Route path="/dashboard" element={
           !session ? <Navigate to="/login" /> :
-          profile?.role === 'coach' || profile?.role === 'admin' ? <CoachDashboard profile={profile} /> :
+          profile?.role === 'admin' ? <Navigate to="/admin" /> :
+          profile?.role === 'coach' ? <CoachDashboard profile={profile} /> :
           profile?.role === 'player' ? <PlayerDashboard profile={profile} /> :
           <div style={{padding:'2rem',fontFamily:'sans-serif'}}>No role assigned. Contact your admin.</div>
         } />
