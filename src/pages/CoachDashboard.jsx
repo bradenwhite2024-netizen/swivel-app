@@ -2,24 +2,18 @@ import { supabase } from '../supabase'
 
 export default function CoachDashboard({ profile }) {
   return (
-    <div style={{minHeight:'100vh',background:'#0a0a0a',color:'#fff',fontFamily:'sans-serif',padding:'2rem'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'2rem'}}>
-        <h1 style={{fontSize:'22px',fontWeight:'700'}}>SWIVEL</h1>
-        <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
-          <span style={{color:'#666',fontSize:'14px'}}>{profile?.full_name || 'Coach'}</span>
-          <button onClick={() => supabase.auth.signOut()} style={{padding:'6px 14px',background:'transparent',border:'1px solid #333',borderRadius:'6px',color:'#aaa',fontSize:'13px',cursor:'pointer'}}>Sign out</button>
-        </div>
+    <div style={{minHeight:'100vh',background:'#0a0a0f',display:'flex',flexDirection:'column'}}>
+      <div style={{height:'48px',display:'flex',alignItems:'center',gap:'12px',padding:'0 20px',background:'rgba(10,10,15,0.95)',borderBottom:'1px solid rgba(255,255,255,0.07)',position:'sticky',top:0,zIndex:200,flexShrink:0}}>
+        <span style={{fontSize:'18px',fontWeight:'900',letterSpacing:'6px',color:'#F5A030'}}>SWIVEL</span>
+        <div style={{width:'1px',height:'24px',background:'rgba(255,255,255,0.12)'}}/>
+        <span style={{fontSize:'11px',color:'rgba(212,200,168,0.45)',flex:1}}>{profile?.full_name || 'Coach'}</span>
+        <button onClick={() => supabase.auth.signOut()} style={{padding:'5px 12px',background:'transparent',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'6px',color:'rgba(212,200,168,0.45)',fontSize:'11px',cursor:'pointer',fontFamily:'Georgia,serif'}}>Sign out</button>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'12px',marginBottom:'2rem'}}>
-        {['Team Stats','Film Sessions','Season Trends','Scouting'].map(tab => (
-          <div key={tab} style={{background:'#111',border:'1px solid #222',borderRadius:'8px',padding:'14px',textAlign:'center',fontSize:'14px',color:'#aaa',cursor:'pointer'}}>
-            {tab}
-          </div>
-        ))}
-      </div>
-      <div style={{background:'#111',border:'1px solid #222',borderRadius:'12px',padding:'2rem',textAlign:'center',color:'#444'}}>
-        Coach dashboard — coming soon
-      </div>
+      <iframe
+        src="/swivel.html"
+        style={{flex:1,border:'none',width:'100%',height:'calc(100vh - 48px)'}}
+        title="Swivel Analytics"
+      />
     </div>
   )
 }
