@@ -1,22 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabase'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 const STATS = [
-  { label: '2PT Made', key: '2pt made', category: 'scoring' },
-  { label: '2PT Att', key: '2pt att', category: 'scoring' },
-  { label: '3PT Made', key: '3pt made', category: 'scoring' },
-  { label: '3PT Att', key: '3pt att', category: 'scoring' },
-  { label: 'FT Made', key: 'ft made', category: 'scoring' },
-  { label: 'FT Att', key: 'ft att', category: 'scoring' },
-  { label: 'AST', key: 'ast', category: 'playmaking' },
-  { label: 'TO', key: 'to', category: 'playmaking' },
-  { label: 'OREB', key: 'oreb', category: 'rebounding' },
-  { label: 'DREB', key: 'dreb', category: 'rebounding' },
-  { label: 'STL', key: 'stl', category: 'defense' },
-  { label: 'BLK', key: 'blk', category: 'defense' },
-  { label: 'DEFL', key: 'defl', category: 'defense' },
-  { label: 'CHG', key: 'chg', category: 'defense' },
-  { label: 'FOUL', key: 'foul', category: 'fouls' },
+  { label: '2PT Made', category: 'scoring' },
+  { label: '2PT Att',  category: 'scoring' },
+  { label: '3PT Made', category: 'scoring' },
+  { label: '3PT Att',  category: 'scoring' },
+  { label: 'FT Made',  category: 'scoring' },
+  { label: 'FT Att',   category: 'scoring' },
+  { label: 'AST',      category: 'playmaking' },
+  { label: 'TO',       category: 'playmaking' },
+  { label: 'OREB',     category: 'rebounding' },
+  { label: 'DREB',     category: 'rebounding' },
+  { label: 'STL',      category: 'defense' },
+  { label: 'BLK',      category: 'defense' },
+  { label: 'DEFL',     category: 'defense' },
+  { label: 'CHG',      category: 'defense' },
+  { label: 'FOUL',     category: 'fouls' },
 ]
 
 const s = {
@@ -27,31 +28,51 @@ const s = {
   green: '#16A34A', red: '#DC2626', blue: '#2563EB',
 }
 
-const input = { background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.12)`, borderRadius: '6px', color: '#EDE0C4', fontFamily: 'Georgia,serif', fontSize: '13px', padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' }
+const inp = {
+  background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.12)`,
+  borderRadius: '6px', color: '#EDE0C4', fontFamily: 'Georgia,serif',
+  fontSize: '13px', padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box'
+}
+
+const R2 = new S3Client({
+  region: 'auto',
+  endpoint: import.meta.env.VITE_R2_ENDPOINT,
+  credentials: {
+    accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
+    secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
+  },
+})
 
 export default function AdminTracker({ profile }) {
-  const [screen, setScreen] = useState('setup')
-  const [teams, setTeams] = useState([])
-  const [games, setGames] = useState([])
-  const [players, setPlayers] = useState([])
+  const [screen, setScreen]           = useState('setup')
+  const [teams, setTeams]             = useState([])
+  const [games, setGames]             = useState([])
+  const [players, setPlayers]         = useState([])
   const [selectedTeam, setSelectedTeam] = useState('')
   const [selectedGame, setSelectedGame] = useState('')
   const [activePlayer, setActivePlayer] = useState(null)
-  const [onCourt, setOnCourt] = useState([])
-  const [events, setEvents] = useState([])
-  const [filmTime, setFilmTime] = useState(0)
-  const [toast, setToast] = useState('')
-  const [undoStack, setUndoStack] = useState([])
+  const [onCourt, setOnCourt]         = useState([])
+  const [events, setEvents]           = useState([])
+  const [filmTime, setFilmTime]       = useState(0)
+  const [toast, setToast]             = useState('')
+  const [undoStack, setUndoStack]     = useState([])
   const [newPlayerNum, setNewPlayerNum] = useState('')
   const [newPlayerName, setNewPlayerName] = useState('')
   const [newPlayerPos, setNewPlayerPos] = useState('Guard')
-  const [newOpp, setNewOpp] = useState('')
-  const [newDate, setNewDate] = useState('')
+  const [newOpp, setNewOpp]           = useState('')
+  const [newDate, setNewDate]         = useState('')
   const [addingPlayer, setAddingPlayer] = useState(false)
-  const [addingGame, setAddingGame] = useState(false)
+  const [addingGame, setAddingGame]   = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
-  const [addingTeam, setAddingTeam] = useState(false)
+  const [addingTeam, setAddingTeam]   = useState(false)
+  const [editingGameName, setEditingGameName] = useState(false)
+  const [gameNameEdit, setGameNameEdit] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(null)
+  const [filmUploaded, setFilmUploaded] = useState(false)
+  const [floatVideo, setFloatVideo]   = useState(false)
+  const [addingPlayerMid, setAddingPlayerMid] = useState(false)
   const videoRef = useRef(null)
+  const videoFileRef = useRef(null)
 
   useEffect(() => { fetchTeams() }, [])
   useEffect(() => { if (selectedTeam) { fetchGames(selectedTeam); fetchPlayers(selectedTeam) } }, [selectedTeam])
@@ -76,12 +97,11 @@ export default function AdminTracker({ profile }) {
     if (error) { showToast('ERROR: ' + error.message); return }
     setTeams(prev => [...prev, data])
     setSelectedTeam(data.id)
-    setNewTeamName('')
-    setAddingTeam(false)
+    setNewTeamName(''); setAddingTeam(false)
     showToast('TEAM ADDED · ' + newTeamName)
   }
 
-  async function addPlayer() {
+  async function addPlayer(mid = false) {
     if (!newPlayerNum || !selectedTeam) { showToast('ENTER JERSEY NUMBER'); return }
     const { data, error } = await supabase.from('players').insert({
       team_id: selectedTeam,
@@ -92,7 +112,10 @@ export default function AdminTracker({ profile }) {
     }).select().single()
     if (error) { showToast('ERROR: ' + error.message); return }
     setPlayers(prev => [...prev, data].sort((a, b) => a.jersey_number - b.jersey_number))
-    setNewPlayerNum(''); setNewPlayerName(''); setAddingPlayer(false)
+    setNewPlayerNum(''); setNewPlayerName('')
+    if (mid) setAddingPlayerMid(false)
+    else setAddingPlayer(false)
+    setActivePlayer(data)
     showToast('PLAYER #' + newPlayerNum + ' ADDED')
   }
 
@@ -116,22 +139,71 @@ export default function AdminTracker({ profile }) {
     showToast('GAME ADDED · ' + newOpp)
   }
 
+  async function saveGameName() {
+    if (!gameNameEdit.trim()) return
+    await supabase.from('games').update({ opponent: gameNameEdit }).eq('id', selectedGame)
+    setGames(prev => prev.map(g => g.id === selectedGame ? { ...g, opponent: gameNameEdit } : g))
+    setEditingGameName(false)
+    showToast('GAME NAME UPDATED')
+  }
+
+  async function uploadFilm(file) {
+    if (!selectedGame) { showToast('SELECT A GAME FIRST'); return }
+    const teamId = selectedTeam
+    const gameId = selectedGame
+    const key = `${teamId}/${gameId}/film.mp4`
+    setUploadProgress(0)
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      await R2.send(new PutObjectCommand({
+        Bucket: import.meta.env.VITE_R2_BUCKET,
+        Key: key,
+        Body: uint8Array,
+        ContentType: 'video/mp4',
+      }))
+      const filmUrl = `${import.meta.env.VITE_R2_PUBLIC_URL}/${key}`
+      await supabase.from('games').update({ film_url: filmUrl }).eq('id', gameId)
+      setGames(prev => prev.map(g => g.id === gameId ? { ...g, film_url: filmUrl } : g))
+      setFilmUploaded(true)
+      setUploadProgress(null)
+      showToast('FILM UPLOADED TO CLOUD ✓')
+    } catch (err) {
+      setUploadProgress(null)
+      showToast('UPLOAD ERROR: ' + err.message)
+    }
+  }
+
+  function loadVideoFile(e) {
+    const file = e.target.files[0]
+    if (!file || !videoRef.current) return
+    videoFileRef.current = file
+    videoRef.current.src = URL.createObjectURL(file)
+    showToast('FILM LOADED LOCALLY')
+  }
+
   function fmt(s) {
     const m = Math.floor(s / 60), sec = Math.floor(s % 60)
     return `${m}:${String(sec).padStart(2, '0')}`
   }
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2000) }
+  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
-  async function logEvent(eventLabel, type, playerId = null) {
+  async function logEvent(eventLabel, type = 'stat', playerId = null) {
     if (!selectedGame) { showToast('SELECT A GAME FIRST'); return }
     const ts = videoRef.current ? videoRef.current.currentTime : filmTime
-    const event = { game_id: selectedGame, player_id: playerId || activePlayer?.id || null, event_type: eventLabel, timestamp_sec: parseFloat(ts.toFixed(1)), period: 'game' }
+    const event = {
+      game_id: selectedGame,
+      player_id: type === 'stat' ? (playerId || activePlayer?.id || null) : null,
+      event_type: eventLabel,
+      timestamp_sec: parseFloat(ts.toFixed(1)),
+      period: 'game'
+    }
     const { data, error } = await supabase.from('events').insert(event).select().single()
     if (error) { showToast('ERROR: ' + error.message); return }
     setEvents(prev => [...prev, { ...event, id: data.id, label: eventLabel }])
     setUndoStack(prev => [...prev, data.id])
-    showToast(eventLabel + (activePlayer ? ' · #' + activePlayer.jersey_number : ''))
+    showToast(eventLabel + (activePlayer && type === 'stat' ? ' · #' + activePlayer.jersey_number : ''))
   }
 
   async function undoLast() {
@@ -147,22 +219,18 @@ export default function AdminTracker({ profile }) {
     setOnCourt(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId])
   }
 
-  function loadVideoFile(e) {
-    const file = e.target.files[0]
-    if (!file || !videoRef.current) return
-    videoRef.current.src = URL.createObjectURL(file)
-    showToast('FILM LOADED')
-  }
+  const recentEvents = [...events].reverse().slice(0, 10)
+  const currentGame = games.find(g => g.id === selectedGame)
 
-  const recentEvents = [...events].reverse().slice(0, 8)
-
-  // ── SETUP SCREEN ──
+  // ══════════════════════════════════════════
+  // SETUP SCREEN
+  // ══════════════════════════════════════════
   if (screen === 'setup') return (
     <div style={{ minHeight: '100vh', background: s.bg, display: 'flex', flexDirection: 'column', fontFamily: 'Georgia,serif' }}>
       <div style={{ height: '48px', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 20px', background: 'rgba(10,10,15,0.95)', borderBottom: `1px solid ${s.border}`, flexShrink: 0 }}>
         <span style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '6px', color: s.orange2 }}>SWIVEL</span>
         <div style={{ width: '1px', height: '24px', background: s.border2 }} />
-        <span style={{ fontSize: '11px', color: s.muted, flex: 1 }}>Internal Tagging Tool · Admin Only</span>
+        <span style={{ fontSize: '11px', color: s.muted, flex: 1 }}>Admin Tagging Tool</span>
         <button onClick={() => supabase.auth.signOut()} style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${s.border2}`, borderRadius: '6px', color: s.muted, fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>Sign out</button>
       </div>
 
@@ -174,15 +242,15 @@ export default function AdminTracker({ profile }) {
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ fontSize: '10px', letterSpacing: '3px', color: s.muted, textTransform: 'uppercase' }}>Team</div>
-              <button onClick={() => setAddingTeam(!addingTeam)} style={{ background: 'rgba(232,130,10,0.12)', border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '10px', fontWeight: '700', padding: '3px 8px', cursor: 'pointer', letterSpacing: '1px' }}>+ New Team</button>
+              <button onClick={() => setAddingTeam(!addingTeam)} style={{ background: 'rgba(232,130,10,0.12)', border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '10px', fontWeight: '700', padding: '3px 8px', cursor: 'pointer' }}>+ New Team</button>
             </div>
             {addingTeam && (
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <input placeholder='Team name' value={newTeamName} onChange={e => setNewTeamName(e.target.value)} style={input} />
+                <input placeholder='Team name' value={newTeamName} onChange={e => setNewTeamName(e.target.value)} style={inp} />
                 <button onClick={addTeam} style={{ background: s.green, border: 'none', borderRadius: '6px', color: '#fff', fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '8px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Add</button>
               </div>
             )}
-            <select value={selectedTeam} onChange={e => setSelectedTeam(e.target.value)} style={{ ...input }}>
+            <select value={selectedTeam} onChange={e => setSelectedTeam(e.target.value)} style={inp}>
               <option value=''>Select team...</option>
               {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
@@ -198,17 +266,17 @@ export default function AdminTracker({ profile }) {
               {addingPlayer && (
                 <div style={{ marginBottom: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px', gap: '6px', marginBottom: '6px' }}>
-                    <input placeholder='# Jersey' value={newPlayerNum} onChange={e => setNewPlayerNum(e.target.value)} style={input} />
-                    <input placeholder='Name (optional)' value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} style={input} />
-                    <select value={newPlayerPos} onChange={e => setNewPlayerPos(e.target.value)} style={input}>
+                    <input placeholder='# Jersey' value={newPlayerNum} onChange={e => setNewPlayerNum(e.target.value)} style={inp} />
+                    <input placeholder='Name' value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} style={inp} />
+                    <select value={newPlayerPos} onChange={e => setNewPlayerPos(e.target.value)} style={inp}>
                       {['Guard', 'Forward', 'Center'].map(p => <option key={p}>{p}</option>)}
                     </select>
                   </div>
-                  <button onClick={addPlayer} style={{ width: '100%', background: s.green, border: 'none', borderRadius: '6px', color: '#fff', fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '8px', cursor: 'pointer', letterSpacing: '2px' }}>CONFIRM ADD</button>
+                  <button onClick={() => addPlayer(false)} style={{ width: '100%', background: s.green, border: 'none', borderRadius: '6px', color: '#fff', fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '8px', cursor: 'pointer', letterSpacing: '2px' }}>CONFIRM ADD</button>
                 </div>
               )}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {players.length === 0 && <div style={{ fontSize: '11px', color: s.muted, letterSpacing: '1px' }}>No players yet — add your roster above</div>}
+                {players.length === 0 && <div style={{ fontSize: '11px', color: s.muted }}>No players yet</div>}
                 {players.map(p => (
                   <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(232,130,10,0.12)', border: `1px solid ${s.orange}`, borderRadius: '6px', padding: '4px 8px' }}>
                     <span style={{ fontSize: '12px', color: s.orange2, fontWeight: '700' }}>#{p.jersey_number}</span>
@@ -229,13 +297,13 @@ export default function AdminTracker({ profile }) {
             {addingGame && (
               <div style={{ marginBottom: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '6px' }}>
-                  <input placeholder='Opponent name' value={newOpp} onChange={e => setNewOpp(e.target.value)} style={input} />
-                  <input type='date' value={newDate} onChange={e => setNewDate(e.target.value)} style={input} />
+                  <input placeholder='Opponent name' value={newOpp} onChange={e => setNewOpp(e.target.value)} style={inp} />
+                  <input type='date' value={newDate} onChange={e => setNewDate(e.target.value)} style={inp} />
                 </div>
                 <button onClick={addGame} style={{ width: '100%', background: s.green, border: 'none', borderRadius: '6px', color: '#fff', fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '8px', cursor: 'pointer', letterSpacing: '2px' }}>CREATE GAME</button>
               </div>
             )}
-            <select value={selectedGame} onChange={e => setSelectedGame(e.target.value)} style={{ ...input }}>
+            <select value={selectedGame} onChange={e => setSelectedGame(e.target.value)} style={inp}>
               <option value=''>Select game...</option>
               {games.map(g => <option key={g.id} value={g.id}>{g.opponent} · {g.game_date}</option>)}
             </select>
@@ -251,52 +319,122 @@ export default function AdminTracker({ profile }) {
     </div>
   )
 
-  // ── TRACKING SCREEN ──
+  // ══════════════════════════════════════════
+  // TRACKING SCREEN
+  // ══════════════════════════════════════════
   return (
     <div style={{ minHeight: '100vh', background: s.bg, fontFamily: 'Georgia,serif', color: s.text }}>
+      {/* NAV */}
       <div style={{ height: '48px', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 16px', background: 'rgba(10,10,15,0.95)', borderBottom: `1px solid ${s.border}`, position: 'sticky', top: 0, zIndex: 200 }}>
         <span style={{ fontSize: '16px', fontWeight: '900', letterSpacing: '6px', color: s.orange2 }}>SWIVEL</span>
         <div style={{ width: '1px', height: '20px', background: s.border2 }} />
-        <span style={{ fontSize: '10px', color: s.muted, flex: 1 }}>TAGGING · {games.find(g => g.id === selectedGame)?.opponent || 'Game'}</span>
+
+        {/* Editable game name */}
+        {editingGameName ? (
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <input value={gameNameEdit} onChange={e => setGameNameEdit(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveGameName()} style={{ ...inp, width: '160px', fontSize: '11px', padding: '4px 8px' }} autoFocus />
+            <button onClick={saveGameName} style={{ background: s.green, border: 'none', borderRadius: '5px', color: '#fff', fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>Save</button>
+            <button onClick={() => setEditingGameName(false)} style={{ background: 'none', border: `1px solid ${s.border2}`, borderRadius: '5px', color: s.muted, fontSize: '10px', padding: '4px 8px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '11px', color: s.muted }}>vs {currentGame?.opponent}</span>
+            <button onClick={() => { setGameNameEdit(currentGame?.opponent || ''); setEditingGameName(true) }} style={{ background: 'rgba(232,130,10,0.1)', border: `1px solid rgba(232,130,10,0.3)`, borderRadius: '4px', color: s.orange2, fontSize: '9px', padding: '2px 7px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>✏ Edit</button>
+          </div>
+        )}
+
+        <span style={{ fontSize: '10px', color: s.muted, flex: 1 }}>{events.length} events tagged</span>
+        <button onClick={() => setFloatVideo(!floatVideo)} style={{ padding: '5px 10px', background: floatVideo ? s.maroon : 'rgba(255,255,255,0.04)', border: `1px solid ${floatVideo ? s.orange : s.border2}`, borderRadius: '6px', color: floatVideo ? s.orange2 : s.muted, fontSize: '10px', cursor: 'pointer', fontFamily: 'Georgia,serif', fontWeight: '700' }}>⧉ Float Video</button>
         <button onClick={undoLast} style={{ padding: '5px 12px', background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '6px', color: '#f87171', fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia,serif', fontWeight: '700' }}>↩ UNDO</button>
         <button onClick={() => setScreen('setup')} style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${s.border2}`, borderRadius: '6px', color: s.muted, fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>← Back</button>
       </div>
 
-      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {/* Film player */}
-        <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px' }}>
-          <video ref={videoRef} style={{ width: '100%', maxHeight: '200px', background: '#000', borderRadius: '6px', display: 'block' }} onTimeUpdate={() => setFilmTime(videoRef.current?.currentTime || 0)} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '20px', fontWeight: '900', color: s.orange2, fontFamily: 'Courier New,monospace', minWidth: '60px' }}>{fmt(filmTime)}</span>
-            <input type='range' min='0' max={videoRef.current?.duration || 100} value={filmTime} step='0.1' onChange={e => { if (videoRef.current) videoRef.current.currentTime = e.target.value; setFilmTime(+e.target.value) }} style={{ flex: 1, accentColor: s.orange }} />
-            <button onClick={() => { if (videoRef.current) { videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause() } }} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '6px 14px', cursor: 'pointer', letterSpacing: '1px' }}>▶ PLAY</button>
-            {[-5, 5].map(n => <button key={n} onClick={() => { if (videoRef.current) videoRef.current.currentTime += n }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${s.border2}`, borderRadius: '6px', color: s.text, fontSize: '11px', padding: '6px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>{n > 0 ? '+' : ''}{n}s</button>)}
-            <label style={{ background: s.blue, border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', fontFamily: 'Georgia,serif', letterSpacing: '1px' }}>
-              📂 LOAD FILM<input type='file' accept='video/*' onChange={loadVideoFile} style={{ display: 'none' }} />
+      {/* FLOATING VIDEO */}
+      {floatVideo && (
+        <div style={{ position: 'fixed', bottom: '20px', right: '20px', width: '380px', zIndex: 500, background: s.panel, border: `1px solid ${s.border2}`, borderRadius: '10px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+          <div style={{ padding: '6px 10px', background: 'rgba(123,16,32,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '10px', letterSpacing: '2px', color: s.orange2, fontWeight: '700' }}>FILM · {fmt(filmTime)}</span>
+            <button onClick={() => setFloatVideo(false)} style={{ background: 'none', border: 'none', color: s.muted, cursor: 'pointer', fontSize: '14px' }}>✕</button>
+          </div>
+          <video ref={floatVideo ? videoRef : undefined} style={{ width: '100%', maxHeight: '200px', background: '#000', display: 'block' }} onTimeUpdate={() => setFilmTime(videoRef.current?.currentTime || 0)} controls />
+          <div style={{ padding: '8px 10px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {[-5, 5].map(n => <button key={n} onClick={() => { if (videoRef.current) videoRef.current.currentTime += n }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${s.border2}`, borderRadius: '5px', color: s.text, fontSize: '10px', padding: '4px 8px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>{n > 0 ? '+' : ''}{n}s</button>)}
+            <label style={{ background: s.blue, border: 'none', borderRadius: '5px', color: '#fff', fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>
+              📂 Load<input type='file' accept='video/*' onChange={loadVideoFile} style={{ display: 'none' }} />
             </label>
+            {videoFileRef.current && !filmUploaded && (
+              <button onClick={() => uploadFilm(videoFileRef.current)} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '5px', color: s.orange2, fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>☁ Upload</button>
+            )}
+            {filmUploaded && <span style={{ fontSize: '10px', color: s.green, alignSelf: 'center' }}>✓ Uploaded</span>}
           </div>
         </div>
+      )}
 
-        {/* Possession + Opp */}
+      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+        {/* FILM PLAYER (inline, when not floating) */}
+        {!floatVideo && (
+          <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px' }}>
+            <video ref={videoRef} style={{ width: '100%', maxHeight: '220px', background: '#000', borderRadius: '6px', display: 'block' }} onTimeUpdate={() => setFilmTime(videoRef.current?.currentTime || 0)} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '20px', fontWeight: '900', color: s.orange2, fontFamily: 'Courier New,monospace', minWidth: '60px' }}>{fmt(filmTime)}</span>
+              <input type='range' min='0' max={videoRef.current?.duration || 100} value={filmTime} step='0.1'
+                onChange={e => { if (videoRef.current) videoRef.current.currentTime = e.target.value; setFilmTime(+e.target.value) }}
+                style={{ flex: 1, accentColor: s.orange }} />
+              <button onClick={() => { if (videoRef.current) { videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause() } }}
+                style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '6px 14px', cursor: 'pointer' }}>▶ PLAY</button>
+              {[-5, 5].map(n => <button key={n} onClick={() => { if (videoRef.current) videoRef.current.currentTime += n }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${s.border2}`, borderRadius: '6px', color: s.text, fontSize: '11px', padding: '6px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>{n > 0 ? '+' : ''}{n}s</button>)}
+              <label style={{ background: s.blue, border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>
+                📂 LOAD FILM<input type='file' accept='video/*' onChange={loadVideoFile} style={{ display: 'none' }} />
+              </label>
+              {videoFileRef.current && !filmUploaded && (
+                <button onClick={() => uploadFilm(videoFileRef.current)} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', letterSpacing: '1px' }}>
+                  {uploadProgress !== null ? `UPLOADING ${uploadProgress}%` : '☁ UPLOAD TO CLOUD'}
+                </button>
+              )}
+              {filmUploaded && <span style={{ fontSize: '11px', color: s.green, fontWeight: '700' }}>✓ FILM SAVED TO CLOUD</span>}
+              {currentGame?.film_url && !filmUploaded && <span style={{ fontSize: '10px', color: s.muted }}>Film stored in cloud</span>}
+            </div>
+          </div>
+        )}
+
+        {/* POSSESSION + OPP */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '10px' }}>
             <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '8px' }}>Possession</div>
             <div style={{ display: 'flex', gap: '6px' }}>
-              <button onClick={() => logEvent('Offensive Possession', 'poss', null)} style={{ flex: 1, background: 'rgba(22,163,74,0.15)', border: '1px solid rgba(22,163,74,0.4)', borderRadius: '6px', color: '#4ade80', fontFamily: 'Georgia,serif', fontSize: '10px', fontWeight: '700', padding: '8px 4px', cursor: 'pointer', letterSpacing: '1px' }}>+ OFF</button>
-              <button onClick={() => logEvent('Defensive Possession', 'poss', null)} style={{ flex: 1, background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.4)', borderRadius: '6px', color: '#60a5fa', fontFamily: 'Georgia,serif', fontSize: '10px', fontWeight: '700', padding: '8px 4px', cursor: 'pointer', letterSpacing: '1px' }}>+ DEF</button>
+              <button onClick={() => logEvent('Offensive Possession', 'poss')} style={{ flex: 1, background: 'rgba(22,163,74,0.15)', border: '1px solid rgba(22,163,74,0.4)', borderRadius: '6px', color: '#4ade80', fontFamily: 'Georgia,serif', fontSize: '10px', fontWeight: '700', padding: '8px 4px', cursor: 'pointer' }}>+ OFF</button>
+              <button onClick={() => logEvent('Defensive Possession', 'poss')} style={{ flex: 1, background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.4)', borderRadius: '6px', color: '#60a5fa', fontFamily: 'Georgia,serif', fontSize: '10px', fontWeight: '700', padding: '8px 4px', cursor: 'pointer' }}>+ DEF</button>
             </div>
           </div>
           <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '10px' }}>
             <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '8px' }}>Opp Score</div>
             <div style={{ display: 'flex', gap: '6px' }}>
-              {[1, 2, 3].map(n => <button key={n} onClick={() => logEvent('Opponent +' + n, 'opp', null)} style={{ flex: 1, background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.4)', borderRadius: '6px', color: '#f87171', fontFamily: 'Georgia,serif', fontSize: '12px', fontWeight: '900', padding: '8px 4px', cursor: 'pointer' }}>+{n}</button>)}
+              {[1, 2, 3].map(n => <button key={n} onClick={() => logEvent('Opponent +' + n, 'opp')} style={{ flex: 1, background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.4)', borderRadius: '6px', color: '#f87171', fontFamily: 'Georgia,serif', fontSize: '12px', fontWeight: '900', padding: '8px 4px', cursor: 'pointer' }}>+{n}</button>)}
             </div>
           </div>
         </div>
 
-        {/* Active player */}
+        {/* ACTIVE PLAYER */}
         <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px' }}>
-          <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '10px' }}>Active Player</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700' }}>Active Player</div>
+            <button onClick={() => setAddingPlayerMid(!addingPlayerMid)} style={{ background: 'rgba(232,130,10,0.12)', border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '10px', fontWeight: '700', padding: '3px 8px', cursor: 'pointer' }}>+ Add Player</button>
+          </div>
+
+          {addingPlayerMid && (
+            <div style={{ marginBottom: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '10px', border: `1px solid ${s.border2}` }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px', gap: '6px', marginBottom: '6px' }}>
+                <input placeholder='# Jersey' value={newPlayerNum} onChange={e => setNewPlayerNum(e.target.value)} style={{ ...inp, fontSize: '12px' }} />
+                <input placeholder='Name' value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} style={{ ...inp, fontSize: '12px' }} />
+                <select value={newPlayerPos} onChange={e => setNewPlayerPos(e.target.value)} style={{ ...inp, fontSize: '12px' }}>
+                  {['Guard', 'Forward', 'Center'].map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <button onClick={() => addPlayer(true)} style={{ width: '100%', background: s.green, border: 'none', borderRadius: '6px', color: '#fff', fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '8px', cursor: 'pointer', letterSpacing: '2px' }}>ADD TO ROSTER</button>
+            </div>
+          )}
+
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {players.map(p => (
               <button key={p.id} onClick={() => setActivePlayer(p)} style={{ background: activePlayer?.id === p.id ? s.orange : 'rgba(255,255,255,0.04)', border: `1px solid ${activePlayer?.id === p.id ? s.orange : s.border2}`, borderRadius: '6px', color: activePlayer?.id === p.id ? s.maroon : s.text, fontFamily: 'Georgia,serif', fontSize: '13px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer' }}>#{p.jersey_number}</button>
@@ -304,7 +442,7 @@ export default function AdminTracker({ profile }) {
           </div>
         </div>
 
-        {/* On court */}
+        {/* ON COURT */}
         <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px' }}>
           <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '10px' }}>On Court ({onCourt.length})</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -314,7 +452,7 @@ export default function AdminTracker({ profile }) {
           </div>
         </div>
 
-        {/* Stat buttons */}
+        {/* STAT BUTTONS */}
         {['scoring', 'playmaking', 'rebounding', 'defense', 'fouls'].map(cat => {
           const catStats = STATS.filter(st => st.category === cat)
           return (
@@ -322,17 +460,18 @@ export default function AdminTracker({ profile }) {
               <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '10px' }}>{cat}</div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(catStats.length, 3)}, 1fr)`, gap: '6px' }}>
                 {catStats.map(stat => (
-                  <button key={stat.key} onClick={() => logEvent(stat.label, 'stat')} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '8px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '12px', fontWeight: '900', padding: '12px 8px', cursor: 'pointer', letterSpacing: '1px', textTransform: 'uppercase' }}>{stat.label}</button>
+                  <button key={stat.label} onClick={() => logEvent(stat.label, 'stat')}
+                    style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '8px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '12px', fontWeight: '900', padding: '12px 8px', cursor: 'pointer', letterSpacing: '1px', textTransform: 'uppercase' }}>{stat.label}</button>
                 ))}
               </div>
             </div>
           )
         })}
 
-        {/* Recent events */}
+        {/* RECENT EVENTS */}
         <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px', marginBottom: '24px' }}>
-          <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '10px' }}>Recent ({events.length} total)</div>
-          {recentEvents.length === 0 && <div style={{ fontSize: '11px', color: s.muted, letterSpacing: '1px' }}>No events yet — start tagging</div>}
+          <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '10px' }}>Recent Events ({events.length} total)</div>
+          {recentEvents.length === 0 && <div style={{ fontSize: '11px', color: s.muted }}>No events yet — start tagging</div>}
           {recentEvents.map((e, i) => {
             const player = players.find(p => p.id === e.player_id)
             return (
