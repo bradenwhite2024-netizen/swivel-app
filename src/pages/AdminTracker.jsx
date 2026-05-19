@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabase'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 const STATS = [
   { label: '2PT Made', category: 'scoring' },
@@ -34,14 +33,6 @@ const inp = {
   fontSize: '13px', padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box'
 }
 
-const R2 = new S3Client({
-  region: 'auto',
-  endpoint: import.meta.env.VITE_R2_ENDPOINT,
-  credentials: {
-    accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
-  },
-})
 
 export default function AdminTracker({ profile }) {
   const [screen, setScreen]           = useState('setup')
@@ -149,22 +140,23 @@ export default function AdminTracker({ profile }) {
 
   async function uploadFilm(file) {
     if (!selectedGame) { showToast('SELECT A GAME FIRST'); return }
-    const teamId = selectedTeam
-    const gameId = selectedGame
-    const key = `${teamId}/${gameId}/film.mp4`
-    setUploadProgress(0)
+    setUploadProgress(10)
     try {
-      const arrayBuffer = await file.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-      await R2.send(new PutObjectCommand({
-        Bucket: import.meta.env.VITE_R2_BUCKET,
-        Key: key,
-        Body: uint8Array,
-        ContentType: 'video/mp4',
-      }))
+      const res = await fetch('/api/upload-film', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId: selectedTeam, gameId: selectedGame })
+      })
+      const { url, key } = await res.json()
+      setUploadProgress(30)
+      await fetch(url, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': 'video/mp4' }
+      })
       const filmUrl = `${import.meta.env.VITE_R2_PUBLIC_URL}/${key}`
-      await supabase.from('games').update({ film_url: filmUrl }).eq('id', gameId)
-      setGames(prev => prev.map(g => g.id === gameId ? { ...g, film_url: filmUrl } : g))
+      await supabase.from('games').update({ film_url: filmUrl }).eq('id', selectedGame)
+      setGames(prev => prev.map(g => g.id === selectedGame ? { ...g, film_url: filmUrl } : g))
       setFilmUploaded(true)
       setUploadProgress(null)
       showToast('FILM UPLOADED TO CLOUD ✓')
