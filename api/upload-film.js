@@ -17,15 +17,19 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { teamId, gameId } = req.body
-  const key = `${teamId}/${gameId}/film.mp4`
-
-  const command = new PutObjectCommand({
-    Bucket: process.env.VITE_R2_BUCKET,
-    Key: key,
-    ContentType: 'video/mp4',
-  })
-
-  const url = await getSignedUrl(R2, command, { expiresIn: 3600 })
-  return res.status(200).json({ url, key })
+  try {
+    let body = req.body
+    if (typeof body === 'string') body = JSON.parse(body)
+    const { teamId, gameId } = body
+    const key = `${teamId}/${gameId}/film.mp4`
+    const command = new PutObjectCommand({
+      Bucket: process.env.VITE_R2_BUCKET,
+      Key: key,
+      ContentType: 'video/mp4',
+    })
+    const url = await getSignedUrl(R2, command, { expiresIn: 3600 })
+    return res.status(200).json({ url, key })
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
 }
