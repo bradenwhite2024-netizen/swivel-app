@@ -62,9 +62,8 @@ export default function AdminTracker({ profile }) {
   const [filmUploaded, setFilmUploaded] = useState(false)
   const [floatVideo, setFloatVideo]   = useState(false)
   const [addingPlayerMid, setAddingPlayerMid] = useState(false)
+  const [selectedFile, setSelectedFile] = useState(null)
   const videoRef = useRef(null)
-  const videoFileRef = useRef(null)
-  const selectedFileRef = useRef(null)
 
   useEffect(() => { fetchTeams() }, [])
   useEffect(() => { if (selectedTeam) { fetchGames(selectedTeam); fetchPlayers(selectedTeam) } }, [selectedTeam])
@@ -139,24 +138,27 @@ export default function AdminTracker({ profile }) {
     showToast('GAME NAME UPDATED')
   }
 
-  async function uploadFilm(file) {
-    if (!file) { showToast('LOAD A FILM FILE FIRST'); return }
+  async function uploadFilm() {
+    if (!selectedFile) { showToast('LOAD A FILM FILE FIRST'); return }
     if (!selectedGame) { showToast('SELECT A GAME FIRST'); return }
     setUploadProgress(10)
     try {
       const res = await fetch('/api/upload-film', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId: selectedTeam, gameId: selectedGame, fileSize: file.size })
+        body: JSON.stringify({ teamId: selectedTeam, gameId: selectedGame, fileSize: selectedFile.size })
       })
-      const { url, key } = await res.json()
+      const json = await res.json()
+      if (!json.url) throw new Error(json.error || 'No URL returned')
       setUploadProgress(30)
-      await fetch(url, {
+      const putRes = await fetch(json.url, {
         method: 'PUT',
-        body: file,
+        body: selectedFile,
         headers: { 'Content-Type': 'video/mp4' }
       })
-      const filmUrl = `${import.meta.env.VITE_R2_PUBLIC_URL}/${key}`
+      if (!putRes.ok) throw new Error('Upload failed: ' + putRes.status)
+      setUploadProgress(90)
+      const filmUrl = `${import.meta.env.VITE_R2_PUBLIC_URL}/${json.key}`
       await supabase.from('games').update({ film_url: filmUrl }).eq('id', selectedGame)
       setGames(prev => prev.map(g => g.id === selectedGame ? { ...g, film_url: filmUrl } : g))
       setFilmUploaded(true)
@@ -171,10 +173,9 @@ export default function AdminTracker({ profile }) {
   function loadVideoFile(e) {
     const file = e.target.files[0]
     if (!file || !videoRef.current) return
-    videoFileRef.current = file
-    selectedFileRef.current = file
+    setSelectedFile(file)
     videoRef.current.src = URL.createObjectURL(file)
-    showToast('FILM LOADED LOCALLY')
+    showToast('FILM LOADED · ' + file.name)
   }
 
   function fmt(s) {
@@ -217,9 +218,6 @@ export default function AdminTracker({ profile }) {
   const recentEvents = [...events].reverse().slice(0, 10)
   const currentGame = games.find(g => g.id === selectedGame)
 
-  // ══════════════════════════════════════════
-  // SETUP SCREEN
-  // ══════════════════════════════════════════
   if (screen === 'setup') return (
     <div style={{ minHeight: '100vh', background: s.bg, display: 'flex', flexDirection: 'column', fontFamily: 'Georgia,serif' }}>
       <div style={{ height: '48px', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 20px', background: 'rgba(10,10,15,0.95)', borderBottom: `1px solid ${s.border}`, flexShrink: 0 }}>
@@ -233,7 +231,6 @@ export default function AdminTracker({ profile }) {
         <div style={{ background: s.panel, border: `1px solid ${s.border2}`, borderRadius: '16px', padding: '36px', width: '100%', maxWidth: '520px' }}>
           <div style={{ fontSize: '10px', letterSpacing: '5px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '24px', paddingBottom: '12px', borderBottom: `1px solid ${s.border}` }}>Game Setup</div>
 
-          {/* TEAM */}
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ fontSize: '10px', letterSpacing: '3px', color: s.muted, textTransform: 'uppercase' }}>Team</div>
@@ -251,7 +248,6 @@ export default function AdminTracker({ profile }) {
             </select>
           </div>
 
-          {/* ROSTER */}
           {selectedTeam && (
             <div style={{ marginBottom: '20px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${s.border}`, borderRadius: '10px', padding: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -283,7 +279,6 @@ export default function AdminTracker({ profile }) {
             </div>
           )}
 
-          {/* GAME */}
           <div style={{ marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ fontSize: '10px', letterSpacing: '3px', color: s.muted, textTransform: 'uppercase' }}>Game</div>
@@ -314,12 +309,8 @@ export default function AdminTracker({ profile }) {
     </div>
   )
 
-  // ══════════════════════════════════════════
-  // TRACKING SCREEN
-  // ══════════════════════════════════════════
   return (
     <div style={{ minHeight: '100vh', background: s.bg, fontFamily: 'Georgia,serif', color: s.text }}>
-      {/* NAV */}
       <div style={{ height: '48px', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 16px', background: 'rgba(10,10,15,0.95)', borderBottom: `1px solid ${s.border}`, position: 'sticky', top: 0, zIndex: 200 }}>
         <span style={{ fontSize: '16px', fontWeight: '900', letterSpacing: '6px', color: s.orange2 }}>SWIVEL</span>
         <div style={{ width: '1px', height: '20px', background: s.border2 }} />
@@ -343,7 +334,6 @@ export default function AdminTracker({ profile }) {
         <button onClick={() => setScreen('setup')} style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${s.border2}`, borderRadius: '6px', color: s.muted, fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>← Back</button>
       </div>
 
-      {/* FLOATING VIDEO */}
       {floatVideo && (
         <div style={{ position: 'fixed', bottom: '20px', right: '20px', width: '380px', zIndex: 500, background: s.panel, border: `1px solid ${s.border2}`, borderRadius: '10px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
           <div style={{ padding: '6px 10px', background: 'rgba(123,16,32,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -356,8 +346,10 @@ export default function AdminTracker({ profile }) {
             <label style={{ background: s.blue, border: 'none', borderRadius: '5px', color: '#fff', fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>
               📂 Load<input type='file' accept='video/*' onChange={loadVideoFile} style={{ display: 'none' }} />
             </label>
-            {selectedFileRef.current && !filmUploaded && (
-              <button onClick={() => uploadFilm(selectedFileRef.current)} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '5px', color: s.orange2, fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>☁ Upload</button>
+            {selectedFile && !filmUploaded && (
+              <button onClick={uploadFilm} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '5px', color: s.orange2, fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>
+                {uploadProgress !== null ? `${uploadProgress}%` : '☁ Upload'}
+              </button>
             )}
             {filmUploaded && <span style={{ fontSize: '10px', color: s.green, alignSelf: 'center' }}>✓ Uploaded</span>}
           </div>
@@ -366,7 +358,6 @@ export default function AdminTracker({ profile }) {
 
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {/* FILM PLAYER (inline, when not floating) */}
         {!floatVideo && (
           <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px' }}>
             <video ref={videoRef} style={{ width: '100%', maxHeight: '220px', background: '#000', borderRadius: '6px', display: 'block' }} onTimeUpdate={() => setFilmTime(videoRef.current?.currentTime || 0)} />
@@ -381,18 +372,18 @@ export default function AdminTracker({ profile }) {
               <label style={{ background: s.blue, border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>
                 📂 LOAD FILM<input type='file' accept='video/*' onChange={loadVideoFile} style={{ display: 'none' }} />
               </label>
-              {selectedFileRef.current && !filmUploaded && (
-                <button onClick={() => uploadFilm(selectedFileRef.current)} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', letterSpacing: '1px' }}>
+              {selectedFile && !filmUploaded && (
+                <button onClick={uploadFilm} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', letterSpacing: '1px' }}>
                   {uploadProgress !== null ? `UPLOADING ${uploadProgress}%` : '☁ UPLOAD TO CLOUD'}
                 </button>
               )}
               {filmUploaded && <span style={{ fontSize: '11px', color: s.green, fontWeight: '700' }}>✓ FILM SAVED TO CLOUD</span>}
               {currentGame?.film_url && !filmUploaded && <span style={{ fontSize: '10px', color: s.muted }}>Film stored in cloud</span>}
+              {selectedFile && <span style={{ fontSize: '10px', color: s.muted }}>📎 {selectedFile.name}</span>}
             </div>
           </div>
         )}
 
-        {/* POSSESSION + OPP */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '10px' }}>
             <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '8px' }}>Possession</div>
@@ -409,13 +400,11 @@ export default function AdminTracker({ profile }) {
           </div>
         </div>
 
-        {/* ACTIVE PLAYER */}
         <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700' }}>Active Player</div>
             <button onClick={() => setAddingPlayerMid(!addingPlayerMid)} style={{ background: 'rgba(232,130,10,0.12)', border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '10px', fontWeight: '700', padding: '3px 8px', cursor: 'pointer' }}>+ Add Player</button>
           </div>
-
           {addingPlayerMid && (
             <div style={{ marginBottom: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '10px', border: `1px solid ${s.border2}` }}>
               <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px', gap: '6px', marginBottom: '6px' }}>
@@ -428,7 +417,6 @@ export default function AdminTracker({ profile }) {
               <button onClick={() => addPlayer(true)} style={{ width: '100%', background: s.green, border: 'none', borderRadius: '6px', color: '#fff', fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '8px', cursor: 'pointer', letterSpacing: '2px' }}>ADD TO ROSTER</button>
             </div>
           )}
-
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {players.map(p => (
               <button key={p.id} onClick={() => setActivePlayer(p)} style={{ background: activePlayer?.id === p.id ? s.orange : 'rgba(255,255,255,0.04)', border: `1px solid ${activePlayer?.id === p.id ? s.orange : s.border2}`, borderRadius: '6px', color: activePlayer?.id === p.id ? s.maroon : s.text, fontFamily: 'Georgia,serif', fontSize: '13px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer' }}>#{p.jersey_number}</button>
@@ -436,7 +424,6 @@ export default function AdminTracker({ profile }) {
           </div>
         </div>
 
-        {/* ON COURT */}
         <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px' }}>
           <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '10px' }}>On Court ({onCourt.length})</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -446,7 +433,6 @@ export default function AdminTracker({ profile }) {
           </div>
         </div>
 
-        {/* STAT BUTTONS */}
         {['scoring', 'playmaking', 'rebounding', 'defense', 'fouls'].map(cat => {
           const catStats = STATS.filter(st => st.category === cat)
           return (
@@ -462,7 +448,6 @@ export default function AdminTracker({ profile }) {
           )
         })}
 
-        {/* RECENT EVENTS */}
         <div style={{ background: s.panel, border: `1px solid ${s.border}`, borderRadius: '10px', padding: '12px', marginBottom: '24px' }}>
           <div style={{ fontSize: '9px', letterSpacing: '3px', color: s.orange, textTransform: 'uppercase', fontWeight: '700', marginBottom: '10px' }}>Recent Events ({events.length} total)</div>
           {recentEvents.length === 0 && <div style={{ fontSize: '11px', color: s.muted }}>No events yet — start tagging</div>}
