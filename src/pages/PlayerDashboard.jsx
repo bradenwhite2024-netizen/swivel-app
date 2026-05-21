@@ -44,47 +44,32 @@ export default function PlayerDashboard({ profile }) {
   useEffect(() => { if (profile?.id) fetchPlayerData() }, [profile])
 
   async function fetchPlayerData() {
-    // Find player record linked to this profile's user id
-    // Players are linked by matching profile org — get team first
+    // Get profile with player_id
     const { data: profileData } = await supabase
       .from('profiles').select('*').eq('id', profile.id).single()
 
-    // Get all teams
-    const { data: teamsData } = await supabase.from('teams').select('*')
-    if (!teamsData?.length) { setLoading(false); return }
+    if (!profileData?.player_id) { setLoading(false); return }
 
-    // Get all players and find one matching this profile
-    // Match by full_name or by profile id stored in player record
-    const { data: allPlayers } = await supabase.from('players').select('*').eq('active', true)
-
-    // Try to find player by profile_id field, or by name match
-    let foundPlayer = allPlayers?.find(p => p.profile_id === profile.id)
-    if (!foundPlayer) {
-      // fallback: match by name
-      foundPlayer = allPlayers?.find(p =>
-        p.name?.toLowerCase() === (profile.full_name||'').toLowerCase()
-      )
-    }
-    if (!foundPlayer && allPlayers?.length) {
-      // last resort for test: use first player on first team
-      foundPlayer = allPlayers[0]
-    }
+    // Get player directly using player_id from profile
+    const { data: foundPlayer } = await supabase
+      .from('players').select('*').eq('id', profileData.player_id).single()
 
     if (!foundPlayer) { setLoading(false); return }
     setPlayer(foundPlayer)
 
-    const foundTeam = teamsData.find(t => t.id === foundPlayer.team_id)
+    // Get team
+    const { data: foundTeam } = await supabase
+      .from('teams').select('*').eq('id', foundPlayer.team_id).single()
     setTeam(foundTeam)
 
-    // Fetch all games for this team
+    // Get games for this team
     const { data: gamesData } = await supabase.from('games').select('*')
       .eq('team_id', foundPlayer.team_id).order('game_date', { ascending: false })
     setGames(gamesData || [])
 
-    // Fetch all events for this player
+    // Get events for this player only
     const { data: eventsData } = await supabase.from('events')
-      .select('*, games!inner(team_id)')
-      .eq('player_id', foundPlayer.id)
+      .select('*').eq('player_id', foundPlayer.id)
     const evts = (eventsData||[]).map(e => ({
       ...e,
       stat: STAT_MAP[e.event_type] || null,
@@ -155,6 +140,14 @@ export default function PlayerDashboard({ profile }) {
     <div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',color:C.orange2,fontFamily:'Georgia,serif',fontSize:'14px',letterSpacing:'4px'}}>LOADING...</div>
   )
 
+  if (!player) return (
+    <div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'16px',fontFamily:'Georgia,serif'}}>
+      <div style={{fontSize:'14px',color:C.orange2,letterSpacing:'4px'}}>NO PLAYER PROFILE FOUND</div>
+      <div style={{fontSize:'11px',color:C.muted,letterSpacing:'2px'}}>Contact your admin to link your account</div>
+      <button onClick={()=>supabase.auth.signOut()} style={{marginTop:'12px',padding:'8px 20px',background:'transparent',border:`1px solid ${C.border2}`,borderRadius:'6px',color:C.muted,fontSize:'11px',cursor:'pointer',fontFamily:'Georgia,serif'}}>Sign out</button>
+    </div>
+  )
+
   const tabs = [
     {id:'mystats',lbl:'My Stats'},
     {id:'film',lbl:'My Film'},
@@ -197,14 +190,13 @@ export default function PlayerDashboard({ profile }) {
         {/* ══════════ MY STATS ══════════ */}
         {activeTab==='mystats' && (
           <div>
-            {/* Player hero */}
             <div style={{background:'linear-gradient(135deg,rgba(123,16,32,0.4) 0%,rgba(16,16,24,0.95) 60%)',border:`1px solid rgba(232,130,10,0.22)`,borderLeft:`4px solid ${C.orange}`,borderRadius:'10px',padding:'24px 28px',marginBottom:'20px',position:'relative',overflow:'hidden'}}>
               <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 50% 120% at 0% 50%,rgba(123,16,32,0.15) 0%,transparent 60%)',pointerEvents:'none'}}/>
               <div style={{display:'flex',alignItems:'center',gap:'24px',flexWrap:'wrap'}}>
                 <div>
                   <div style={{fontSize:'9px',letterSpacing:'5px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'6px'}}>Player</div>
                   <div style={{fontSize:'52px',fontWeight:'900',color:C.cream,lineHeight:'1'}}>#{player?.jersey_number||'—'}</div>
-                  <div style={{fontSize:'13px',color:C.muted,letterSpacing:'2px',marginTop:'4px'}}>{profile?.full_name||'Player'} · {player?.position||''}  · {team?.name||''}</div>
+                  <div style={{fontSize:'13px',color:C.muted,letterSpacing:'2px',marginTop:'4px'}}>{profile?.full_name||'Player'} · {player?.position||''} · {team?.name||''}</div>
                   <div style={{fontSize:'11px',color:C.muted,marginTop:'4px'}}>{gp} GP · {statEvents.length} tagged events</div>
                 </div>
                 <div style={{width:'1px',height:'60px',background:'rgba(255,255,255,0.08)'}}/>
@@ -222,7 +214,6 @@ export default function PlayerDashboard({ profile }) {
             {statEvents.length===0
               ? <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'40px',textAlign:'center',color:C.muted,fontSize:'13px',letterSpacing:'2px'}}>📊 Stats will appear here as games are tagged<br/><span style={{fontSize:'10px',opacity:0.6,marginTop:'8px',display:'block'}}>Your season stats, shooting splits, and advanced metrics will all live here</span></div>
               : <>
-                  {/* Shooting splits */}
                   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'12px',marginBottom:'20px'}}>
                     {[
                       {lbl:'Points',val:pts,sub:'total'},
@@ -241,8 +232,6 @@ export default function PlayerDashboard({ profile }) {
                       </div>
                     ))}
                   </div>
-
-                  {/* Event breakdown */}
                   <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'20px'}}>
                     <div style={{fontSize:'9px',letterSpacing:'4px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'16px',paddingBottom:'12px',borderBottom:`1px solid ${C.border}`}}>All Events</div>
                     <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
@@ -266,7 +255,6 @@ export default function PlayerDashboard({ profile }) {
         {/* ══════════ MY FILM ══════════ */}
         {activeTab==='film' && (
           <div style={{display:'flex',gap:'14px',alignItems:'flex-start'}}>
-            {/* Video */}
             <div style={{flex:1,minWidth:0,maxWidth:'calc(100% - 330px)'}}>
               {!videoURL
                 ? <div style={{background:C.panel,border:`2px dashed rgba(123,16,32,0.5)`,borderRadius:'10px',padding:'48px',textAlign:'center',cursor:'pointer'}} onClick={()=>document.getElementById('player-film-input').click()}>
@@ -281,8 +269,6 @@ export default function PlayerDashboard({ profile }) {
                 <button onClick={()=>document.getElementById('player-film-input').click()} style={{background:'rgba(232,130,10,0.12)',border:`1px solid rgba(232,130,10,0.35)`,borderRadius:'7px',color:C.orange2,fontFamily:'Georgia,serif',fontSize:'10px',padding:'8px 14px',cursor:'pointer',letterSpacing:'1px'}}>📂 Load Film</button>
               </div>
             </div>
-
-            {/* My clips */}
             <div style={{width:'300px',flexShrink:0,display:'flex',flexDirection:'column',gap:'10px'}}>
               <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'14px',display:'flex',flexDirection:'column',gap:'8px'}}>
                 <div style={{fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700'}}>Filter My Clips</div>
@@ -291,7 +277,6 @@ export default function PlayerDashboard({ profile }) {
                   {[...new Set(statEvents.map(e=>e.stat))].filter(Boolean).map(s=><option key={s} value={s}>{STAT_LABELS[s]||s}</option>)}
                 </select>
               </div>
-
               <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',maxHeight:'500px',overflowY:'auto'}}>
                 <div style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700'}}>My Events ({filmEvents.length})</div>
                 {filmEvents.length===0
@@ -316,7 +301,6 @@ export default function PlayerDashboard({ profile }) {
             {seasonRows.length===0
               ? <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'40px',textAlign:'center',color:C.muted,fontSize:'13px',letterSpacing:'2px'}}>No game data yet</div>
               : <>
-                  {/* Season averages */}
                   <div style={{background:'linear-gradient(135deg,rgba(123,16,32,0.3) 0%,rgba(16,16,24,0.95) 60%)',border:`1px solid rgba(232,130,10,0.2)`,borderLeft:`4px solid ${C.orange}`,borderRadius:'10px',padding:'20px 24px',marginBottom:'20px',display:'flex',gap:'24px',flexWrap:'wrap',alignItems:'center'}}>
                     <div><div style={{fontSize:'9px',letterSpacing:'4px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'4px'}}>Season Averages</div><div style={{fontSize:'11px',color:C.muted}}>{seasonRows.length} games played</div></div>
                     {[['PPG',ppg],['RPG',rpg],['APG',apg],['SPG',spg],['TS%',ts]].map(([l,v])=>(
@@ -326,8 +310,6 @@ export default function PlayerDashboard({ profile }) {
                       </div>
                     ))}
                   </div>
-
-                  {/* Game log table */}
                   <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'20px',overflowX:'auto'}}>
                     <div style={{fontSize:'9px',letterSpacing:'4px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'16px',paddingBottom:'12px',borderBottom:`1px solid ${C.border}`}}>Game Log</div>
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
@@ -373,12 +355,9 @@ export default function PlayerDashboard({ profile }) {
                 </button>
               )}
             </div>
-
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px'}}>
-              {/* Available clips */}
               <div>
                 <div style={{fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'12px'}}>Your Clips ({filmEvents.length})</div>
-                {/* Stat filter buttons */}
                 <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
                   <button onClick={()=>setStatFilter('')} style={{background:!statFilter?C.maroon:'rgba(255,255,255,0.04)',border:`1px solid ${!statFilter?C.orange:C.border}`,borderRadius:'6px',color:!statFilter?C.orange2:C.muted,fontFamily:'Georgia,serif',fontSize:'10px',padding:'5px 12px',cursor:'pointer',letterSpacing:'1px'}}>All</button>
                   {[...new Set(statEvents.map(e=>e.stat))].filter(Boolean).map(s=>(
@@ -398,8 +377,6 @@ export default function PlayerDashboard({ profile }) {
                     </div>
                 }
               </div>
-
-              {/* Reel queue */}
               <div>
                 <div style={{fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'12px'}}>Your Reel ({reelClips.length} clips)</div>
                 {reelClips.length===0
