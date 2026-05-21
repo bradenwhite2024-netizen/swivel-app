@@ -64,6 +64,7 @@ export default function AdminTracker({ profile }) {
   const [addingPlayerMid, setAddingPlayerMid] = useState(false)
   const videoRef = useRef(null)
   const videoFileRef = useRef(null)
+  const selectedFileRef = useRef(null)
 
   useEffect(() => { fetchTeams() }, [])
   useEffect(() => { if (selectedTeam) { fetchGames(selectedTeam); fetchPlayers(selectedTeam) } }, [selectedTeam])
@@ -139,6 +140,7 @@ export default function AdminTracker({ profile }) {
   }
 
   async function uploadFilm(file) {
+    if (!file) { showToast('LOAD A FILM FILE FIRST'); return }
     if (!selectedGame) { showToast('SELECT A GAME FIRST'); return }
     setUploadProgress(10)
     try {
@@ -170,6 +172,7 @@ export default function AdminTracker({ profile }) {
     const file = e.target.files[0]
     if (!file || !videoRef.current) return
     videoFileRef.current = file
+    selectedFileRef.current = file
     videoRef.current.src = URL.createObjectURL(file)
     showToast('FILM LOADED LOCALLY')
   }
@@ -321,7 +324,6 @@ export default function AdminTracker({ profile }) {
         <span style={{ fontSize: '16px', fontWeight: '900', letterSpacing: '6px', color: s.orange2 }}>SWIVEL</span>
         <div style={{ width: '1px', height: '20px', background: s.border2 }} />
 
-        {/* Editable game name */}
         {editingGameName ? (
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <input value={gameNameEdit} onChange={e => setGameNameEdit(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveGameName()} style={{ ...inp, width: '160px', fontSize: '11px', padding: '4px 8px' }} autoFocus />
@@ -354,8 +356,8 @@ export default function AdminTracker({ profile }) {
             <label style={{ background: s.blue, border: 'none', borderRadius: '5px', color: '#fff', fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>
               📂 Load<input type='file' accept='video/*' onChange={loadVideoFile} style={{ display: 'none' }} />
             </label>
-            {videoFileRef.current && !filmUploaded && (
-              <button onClick={() => uploadFilm(videoFileRef.current)} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '5px', color: s.orange2, fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>☁ Upload</button>
+            {selectedFileRef.current && !filmUploaded && (
+              <button onClick={() => uploadFilm(selectedFileRef.current)} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '5px', color: s.orange2, fontSize: '10px', fontWeight: '900', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>☁ Upload</button>
             )}
             {filmUploaded && <span style={{ fontSize: '10px', color: s.green, alignSelf: 'center' }}>✓ Uploaded</span>}
           </div>
@@ -379,8 +381,8 @@ export default function AdminTracker({ profile }) {
               <label style={{ background: s.blue, border: 'none', borderRadius: '6px', color: '#fff', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>
                 📂 LOAD FILM<input type='file' accept='video/*' onChange={loadVideoFile} style={{ display: 'none' }} />
               </label>
-              {videoFileRef.current && !filmUploaded && (
-                <button onClick={() => uploadFilm(videoFileRef.current)} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', letterSpacing: '1px' }}>
+              {selectedFileRef.current && !filmUploaded && (
+                <button onClick={() => uploadFilm(selectedFileRef.current)} style={{ background: s.maroon, border: `1px solid ${s.orange}`, borderRadius: '6px', color: s.orange2, fontFamily: 'Georgia,serif', fontSize: '11px', fontWeight: '900', padding: '6px 12px', cursor: 'pointer', letterSpacing: '1px' }}>
                   {uploadProgress !== null ? `UPLOADING ${uploadProgress}%` : '☁ UPLOAD TO CLOUD'}
                 </button>
               )}
