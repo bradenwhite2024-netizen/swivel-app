@@ -33,7 +33,6 @@ const inp = {
   fontSize: '13px', padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box'
 }
 
-
 export default function AdminTracker({ profile }) {
   const [screen, setScreen]           = useState('setup')
   const [teams, setTeams]             = useState([])
@@ -69,9 +68,25 @@ export default function AdminTracker({ profile }) {
   useEffect(() => { if (selectedTeam) { fetchGames(selectedTeam); fetchPlayers(selectedTeam) } }, [selectedTeam])
 
   async function fetchTeams() {
-    const { data } = await supabase.from('teams').select('*')
-    setTeams(data || [])
+    // Get only teams assigned to this admin via team_admins table
+    const { data: adminTeams } = await supabase
+      .from('team_admins')
+      .select('team_id')
+      .eq('user_id', profile.id)
+
+    if (adminTeams?.length) {
+      const teamIds = adminTeams.map(t => t.team_id)
+      const { data } = await supabase.from('teams').select('*').in('id', teamIds)
+      setTeams(data || [])
+      if (data?.length) setSelectedTeam(data[0].id)
+    } else {
+      // fallback: show all teams if no assignment found
+      const { data } = await supabase.from('teams').select('*')
+      setTeams(data || [])
+      if (data?.length) setSelectedTeam(data[0].id)
+    }
   }
+
   async function fetchGames(teamId) {
     const { data } = await supabase.from('games').select('*').eq('team_id', teamId).order('game_date', { ascending: false })
     setGames(data || [])
@@ -86,6 +101,8 @@ export default function AdminTracker({ profile }) {
     if (!newTeamName) { showToast('ENTER TEAM NAME'); return }
     const { data, error } = await supabase.from('teams').insert({ org_id: '00000000-0000-0000-0000-000000000001', name: newTeamName, season: '2025-26' }).select().single()
     if (error) { showToast('ERROR: ' + error.message); return }
+    // Also assign this admin to the new team
+    await supabase.from('team_admins').insert({ user_id: profile.id, team_id: data.id })
     setTeams(prev => [...prev, data])
     setSelectedTeam(data.id)
     setNewTeamName(''); setAddingTeam(false)
@@ -223,7 +240,7 @@ export default function AdminTracker({ profile }) {
       <div style={{ height: '48px', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 20px', background: 'rgba(10,10,15,0.95)', borderBottom: `1px solid ${s.border}`, flexShrink: 0 }}>
         <span style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '6px', color: s.orange2 }}>SWIVEL</span>
         <div style={{ width: '1px', height: '24px', background: s.border2 }} />
-        <span style={{ fontSize: '11px', color: s.muted, flex: 1 }}>Admin Tagging Tool</span>
+        <span style={{ fontSize: '11px', color: s.muted, flex: 1 }}>Admin Tagging Tool · {profile?.full_name||''}</span>
         <button onClick={() => supabase.auth.signOut()} style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${s.border2}`, borderRadius: '6px', color: s.muted, fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia,serif' }}>Sign out</button>
       </div>
 
