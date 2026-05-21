@@ -145,7 +145,7 @@ export default function AdminTracker({ profile }) {
       const res = await fetch('/api/upload-film', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId: selectedTeam, gameId: selectedGame })
+        body: JSON.stringify({ teamId: selectedTeam, gameId: selectedGame, fileSize: file.size })
       })
       const { url, key } = await res.json()
       setUploadProgress(30)

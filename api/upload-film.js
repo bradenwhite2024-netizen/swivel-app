@@ -20,12 +20,13 @@ export default async function handler(req, res) {
   try {
     let body = req.body
     if (typeof body === 'string') body = JSON.parse(body)
-    const { teamId, gameId } = body
+    const { teamId, gameId, fileSize } = body
     const key = `${teamId}/${gameId}/film.mp4`
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET,
       Key: key,
       ContentType: 'video/mp4',
+      ContentLength: fileSize,
     })
     const url = await getSignedUrl(R2, command, { expiresIn: 3600 })
     return res.status(200).json({ url, key })
