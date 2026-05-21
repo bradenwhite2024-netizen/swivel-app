@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabase'
 
-// ─── CONSTANTS ───────────────────────────────────────────────
 const STAT_MAP = {
   '2PT Made':'twopm','2PT Att':'twopa','3PT Made':'tpm','3PT Att':'tpa',
   'FT Made':'ftm','FT Att':'fta','AST':'ast','TO':'to',
@@ -15,7 +14,6 @@ const STAT_LABELS = {
   def:'DEFL',chg:'CHG',foul:'FOUL'
 }
 
-// ─── STYLES ──────────────────────────────────────────────────
 const C = {
   bg:'#0a0a0f',surface:'#111118',panel:'#16161f',
   border:'rgba(255,255,255,0.07)',border2:'rgba(255,255,255,0.12)',
@@ -24,7 +22,6 @@ const C = {
   muted:'rgba(212,200,168,0.45)',blue:'#2563EB',green:'#16A34A',red:'#DC2626',
 }
 
-// ─── STAT HELPERS ────────────────────────────────────────────
 function buildStatsMap(events, statEvents) {
   const map = {}
   const allPlayers = [...new Set(statEvents.map(e=>e.player_id))].filter(Boolean)
@@ -129,7 +126,6 @@ function gradeColor(gr) {
   return C.red
 }
 
-// ─── BAR CHART ───────────────────────────────────────────────
 function BarChart({ data, color, valFn }) {
   const [widths, setWidths] = useState({})
   const mx = Math.max(...data.map(d=>Math.abs(d.val||0)), 0.001)
@@ -167,7 +163,6 @@ function BarChart({ data, color, valFn }) {
   )
 }
 
-// ─── SPARK LINE ──────────────────────────────────────────────
 function SparkLine({ vals, labels, color, label, fmtFn }) {
   if (!vals || vals.length < 1) return null
   const W=280, H=90, PAD=12
@@ -182,14 +177,11 @@ function SparkLine({ vals, labels, color, label, fmtFn }) {
   const trend=prev!==null?(latest>prev?'▲':latest<prev?'▼':'→'):''
   const trendCol=prev!==null?(latest>prev?C.green:latest<prev?C.red:'#888'):'#888'
   const gradId='ag'+label.replace(/[^a-z]/gi,'')
-
   return (
     <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'14px'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
         <div style={{fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700'}}>{label}</div>
-        <div style={{fontSize:'13px',fontWeight:'900',color}}>
-          {fmtFn(latest)} <span style={{fontSize:'10px',color:trendCol}}>{trend}</span>
-        </div>
+        <div style={{fontSize:'13px',fontWeight:'900',color}}>{fmtFn(latest)} <span style={{fontSize:'10px',color:trendCol}}>{trend}</span></div>
       </div>
       <svg viewBox={`0 0 ${W} ${H+14}`} width="100%" style={{overflow:'visible',display:'block'}}>
         <defs>
@@ -212,18 +204,15 @@ function SparkLine({ vals, labels, color, label, fmtFn }) {
   )
 }
 
-// ─── POST GAME REPORT MODAL ──────────────────────────────────
 function PostGameReport({ game, onClose }) {
   const pStats = game.playerStats || {}
   const pList = Object.keys(pStats).sort((a,b)=>(pStats[b].pts||0)-(pStats[a].pts||0))
   const win = game.teamPts > (game.oppPts||0)
   const diff = game.teamPts - (game.oppPts||0)
-
   const topScorer = pList[0]
   const topPM = [...pList].sort((a,b)=>(pStats[b].pm||0)-(pStats[a].pm||0))[0]
   const topRebounder = [...pList].sort((a,b)=>(pStats[b].reb||0)-(pStats[a].reb||0))[0]
   const topAssister = [...pList].sort((a,b)=>(pStats[b].ast||0)-(pStats[a].ast||0))[0]
-
   const rights=[], wrongs=[]
   pList.forEach(p=>{
     const s=pStats[p]
@@ -237,11 +226,9 @@ function PostGameReport({ game, onClose }) {
   else wrongs.unshift(`Lost by ${Math.abs(diff)} points`)
   if(game.teamPts>(game.oppPts||0)*1.15) rights.push('Dominant offensive performance')
   if((game.oppPts||0)>game.teamPts*1.15) wrongs.push('Defensive breakdown — allowed 15%+ more than scored')
-
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:1000,overflowY:'auto',padding:'24px'}} onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
       <div style={{maxWidth:'700px',margin:'0 auto',background:C.panel,border:`1px solid ${C.border2}`,borderRadius:'14px',padding:'28px'}}>
-        {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
           <div>
             <div style={{fontSize:'11px',letterSpacing:'4px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'4px'}}>Post-Game Report</div>
@@ -253,8 +240,6 @@ function PostGameReport({ game, onClose }) {
             <button onClick={onClose} style={{background:'rgba(255,255,255,0.06)',border:`1px solid ${C.border}`,borderRadius:'7px',color:C.muted,fontFamily:'Georgia,serif',fontSize:'10px',padding:'8px 14px',cursor:'pointer'}}>✕ Close</button>
           </div>
         </div>
-
-        {/* Score grid */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'24px'}}>
           {[
             {lbl:'Result',val:win?'WIN':'LOSS',col:win?C.green:C.red},
@@ -269,8 +254,6 @@ function PostGameReport({ game, onClose }) {
             </div>
           ))}
         </div>
-
-        {/* Right/Wrong */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginBottom:'24px'}}>
           <div style={{background:'rgba(22,163,74,0.06)',border:'1px solid rgba(22,163,74,0.2)',borderRadius:'10px',padding:'16px'}}>
             <div style={{fontSize:'9px',letterSpacing:'3px',color:C.green,textTransform:'uppercase',fontWeight:'700',marginBottom:'12px'}}>✓ What Went Right</div>
@@ -281,8 +264,6 @@ function PostGameReport({ game, onClose }) {
             {wrongs.length ? wrongs.map((r,i)=><div key={i} style={{fontSize:'12px',color:C.text,marginBottom:'7px',paddingLeft:'10px',borderLeft:`2px solid ${C.red}`}}>• {r}</div>) : <div style={{fontSize:'11px',color:C.muted}}>No major issues.</div>}
           </div>
         </div>
-
-        {/* Key moments */}
         <div style={{marginBottom:'24px'}}>
           <div style={{fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'14px'}}>⭐ Key Moments</div>
           <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
@@ -293,8 +274,6 @@ function PostGameReport({ game, onClose }) {
             {Math.abs(diff)<=3 && <div style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${C.border}`,borderRadius:'8px',padding:'12px 14px',fontSize:'12px',color:C.text}}>🏀 <strong>Close game</strong> — decided by {Math.abs(diff)} point{Math.abs(diff)===1?'':'s'}</div>}
           </div>
         </div>
-
-        {/* Analytics table */}
         <div>
           <div style={{fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'14px'}}>📊 Full Analytics Breakdown</div>
           <div style={{overflowX:'auto'}}>
@@ -334,9 +313,6 @@ function PostGameReport({ game, onClose }) {
   )
 }
 
-// ═══════════════════════════════════════════════════════════
-//  MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════
 export default function CoachDashboard({ profile }) {
   const [activeTab, setActiveTab]     = useState('dashboard')
   const [activeBstTab, setActiveBstTab] = useState('gamestats')
@@ -364,11 +340,20 @@ export default function CoachDashboard({ profile }) {
   useEffect(() => { if (selectedTeam) fetchEvents() }, [selectedTeam, selectedGame])
 
   async function fetchTeams() {
-    const { data } = await supabase.from('teams').select('*')
-    setTeams(data||[])
-    if (data?.length) setSelectedTeam(data[0].id)
+    // Use team_id from profile to only show the coach's assigned team
+    if (profile?.team_id) {
+      const { data } = await supabase.from('teams').select('*').eq('id', profile.team_id)
+      setTeams(data||[])
+      if (data?.length) setSelectedTeam(data[0].id)
+    } else {
+      // fallback: show all teams
+      const { data } = await supabase.from('teams').select('*')
+      setTeams(data||[])
+      if (data?.length) setSelectedTeam(data[0].id)
+    }
     setLoading(false)
   }
+
   async function fetchGames() {
     const { data } = await supabase.from('games').select('*').eq('team_id', selectedTeam).order('game_date',{ascending:false})
     setGames(data||[])
@@ -390,7 +375,6 @@ export default function CoachDashboard({ profile }) {
     const sEvts = evts.filter(e=>e.stat && e.player_id)
     setStatEvents(sEvts)
     const sm = buildStatsMap(evts, sEvts)
-    // GP per player
     const gpMap = {}
     const gameIds = [...new Set(evts.map(e=>e.game_id))]
     gameIds.forEach(gid => {
@@ -401,17 +385,12 @@ export default function CoachDashboard({ profile }) {
     setStatsMap(sm)
   }
 
-  function showToast(msg) {
-    setToast(msg)
-    setTimeout(()=>setToast(''), 2600)
-  }
+  function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''), 2600) }
 
-  // ── Sorted players by pts ──
   const sortedPlayers = [...players].sort((a,b)=>
     getPts(statsMap,statEvents,b.id) - getPts(statsMap,statEvents,a.id)
   )
 
-  // ── Season data from games ──
   const seasonGames = games.map(g => {
     const gEvts = events.filter(e=>e.game_id===g.id)
     const gStatEvts = gEvts.filter(e=>e.stat&&e.player_id)
@@ -438,7 +417,6 @@ export default function CoachDashboard({ profile }) {
   const wins = seasonGames.filter(g=>g.teamPts>(g.oppPts||0)).length
   const losses = seasonGames.length - wins
 
-  // ── Per-player display stat helper ──
   function getDisplayStat(pid, col) {
     const gp = Math.max(getStat(statsMap,statEvents,pid,'GP')||1,1)
     const player = players.find(p=>p.id===pid)
@@ -483,7 +461,6 @@ export default function CoachDashboard({ profile }) {
     return getStat(statsMap,statEvents,pid,col)??'—'
   }
 
-  // ── Box score columns ──
   const BST_COLS = {
     gamestats: [{k:'#',lbl:'#'},{k:'name',lbl:'Name'},{k:'GP',lbl:'GP'},{k:'PPG',lbl:'PPG'},{k:'DEFR',lbl:'DREB/G'},{k:'OFFR',lbl:'OREB/G'},{k:'RPG',lbl:'RPG'},{k:'APG',lbl:'APG'},{k:'SPG',lbl:'SPG'},{k:'BPG',lbl:'BPG'},{k:'TPG',lbl:'TPG'}],
     shooting:  [{k:'#',lbl:'#'},{k:'name',lbl:'Name'},{k:'GP',lbl:'GP'},{k:'PTS',lbl:'Pts'},{k:'FG Made',lbl:'FGM'},{k:'FG Att',lbl:'FGA'},{k:'FG%',lbl:'FG%'},{k:'eFG%',lbl:'eFG%'}],
@@ -525,42 +502,16 @@ export default function CoachDashboard({ profile }) {
     )
   }
 
-  // ── Impact bar chart data ──
   const teamPoss = Math.max(events.filter(e=>(e.type||'').toLowerCase()==='poss').length, 1)
   const impactCharts = [
-    {
-      title:'USAGE RATE', id:'ur',
-      data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: parseFloat(((getStat(statsMap,statEvents,p.id,'FG Att')||0)+0.44*(getStat(statsMap,statEvents,p.id,'FT Att')||0)+(getStat(statsMap,statEvents,p.id,'TO')||0))/teamPoss*100) })),
-      color: '#E8820A', valFn: v=>v.toFixed(1)+'%'
-    },
-    {
-      title:'+/− ON', id:'pm',
-      data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: getPM(statsMap,p.id) })),
-      color: v=>v>=0?C.green:C.red, valFn: v=>(v>0?'+':'')+v
-    },
-    {
-      title:'TRUE SHOOTING %', id:'ts',
-      data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: getTSpct(statsMap,statEvents,p.id)||0 })),
-      color: C.blue, valFn: v=>(v*100).toFixed(1)+'%'
-    },
-    {
-      title:'AST/TO RATIO', id:'astto',
-      data: sortedPlayers.map(p=>{ const v=getAstTo(statsMap,statEvents,p.id); return { lbl:'#'+getDisplayStat(p.id,'#'), val:v===null?0:v===99?3:v } }),
-      color: C.blue, valFn: v=>v>=3?'∞':v.toFixed(1)
-    },
-    {
-      title:'HUSTLE (Total)', id:'hustle',
-      data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: getHustle(statsMap,statEvents,p.id)||0 })),
-      color: '#7C3AED', valFn: v=>v+'/G'
-    },
-    {
-      title:'STOCKS (STL+BLK+DEFL)', id:'stocks',
-      data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: getStocks(statsMap,statEvents,p.id)||0 })),
-      color: C.red, valFn: v=>v+'/G'
-    },
+    { title:'USAGE RATE', id:'ur', data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: parseFloat(((getStat(statsMap,statEvents,p.id,'FG Att')||0)+0.44*(getStat(statsMap,statEvents,p.id,'FT Att')||0)+(getStat(statsMap,statEvents,p.id,'TO')||0))/teamPoss*100) })), color: '#E8820A', valFn: v=>v.toFixed(1)+'%' },
+    { title:'+/− ON', id:'pm', data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: getPM(statsMap,p.id) })), color: v=>v>=0?C.green:C.red, valFn: v=>(v>0?'+':'')+v },
+    { title:'TRUE SHOOTING %', id:'ts', data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: getTSpct(statsMap,statEvents,p.id)||0 })), color: C.blue, valFn: v=>(v*100).toFixed(1)+'%' },
+    { title:'AST/TO RATIO', id:'astto', data: sortedPlayers.map(p=>{ const v=getAstTo(statsMap,statEvents,p.id); return { lbl:'#'+getDisplayStat(p.id,'#'), val:v===null?0:v===99?3:v } }), color: C.blue, valFn: v=>v>=3?'∞':v.toFixed(1) },
+    { title:'HUSTLE (Total)', id:'hustle', data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: getHustle(statsMap,statEvents,p.id)||0 })), color: '#7C3AED', valFn: v=>v+'/G' },
+    { title:'STOCKS (STL+BLK+DEFL)', id:'stocks', data: sortedPlayers.map(p=>({ lbl:'#'+getDisplayStat(p.id,'#'), val: getStocks(statsMap,statEvents,p.id)||0 })), color: C.red, valFn: v=>v+'/G' },
   ]
 
-  // ── Film event list ──
   const filmEvents = statEvents
     .filter(e=>e.videoTime!==null && !isNaN(e.videoTime))
     .filter(e=>!playerFilter || e.player_id===playerFilter)
@@ -571,8 +522,7 @@ export default function CoachDashboard({ profile }) {
     const f = e.target.files[0]
     if (!f) return
     if (videoURL) URL.revokeObjectURL(videoURL)
-    const url = URL.createObjectURL(f)
-    setVideoURL(url)
+    setVideoURL(URL.createObjectURL(f))
     setVideoLoaded(true)
     showToast('FILM LOADED')
   }
@@ -588,14 +538,13 @@ export default function CoachDashboard({ profile }) {
     }
   }
 
-  // ── Trend charts ──
   const allTrendPlayers = [...new Set(seasonGames.flatMap(g=>Object.keys(g.playerStats||{})))]
   const sortedSeasonGames = [...seasonGames].sort((a,b)=>new Date(a.game_date)-new Date(b.game_date))
   const trendLabels = sortedSeasonGames.map((g,i)=>g.opponent||(i+1+''))
 
   const teamTrends = [
-    {label:'Points Scored',  vals:sortedSeasonGames.map(g=>g.teamPts),       fmt:v=>v,             color:C.orange},
-    {label:'Points Allowed', vals:sortedSeasonGames.map(g=>g.oppPts||0),     fmt:v=>v,             color:C.red},
+    {label:'Points Scored',  vals:sortedSeasonGames.map(g=>g.teamPts), fmt:v=>v, color:C.orange},
+    {label:'Points Allowed', vals:sortedSeasonGames.map(g=>g.oppPts||0), fmt:v=>v, color:C.red},
     {label:'Point Diff',     vals:sortedSeasonGames.map(g=>g.teamPts-(g.oppPts||0)), fmt:v=>(v>0?'+':'')+v, color:C.green},
     {label:'FG%',            vals:sortedSeasonGames.map(g=>{ const ps=Object.values(g.playerStats||{}); const m=ps.reduce((s,p)=>s+(p.fgm||0),0),a=ps.reduce((s,p)=>s+(p.fga||0),0); return a>0?parseFloat((m/a*100).toFixed(1)):0 }), fmt:v=>v+'%', color:C.blue},
     {label:'Turnovers',      vals:sortedSeasonGames.map(g=>{ const ps=Object.values(g.playerStats||{}); return ps.reduce((s,p)=>s+(p.to||0),0) }), fmt:v=>v, color:'#D97706'},
@@ -606,19 +555,17 @@ export default function CoachDashboard({ profile }) {
     return {
       labels: pg.map((g,i)=>g.opponent||(i+1+'')),
       metrics: [
-        {label:'Points',  vals:pg.map(g=>g.playerStats[playerLabel].pts||0),  fmt:v=>v,            color:C.orange},
-        {label:'Assists', vals:pg.map(g=>g.playerStats[playerLabel].ast||0),  fmt:v=>v,            color:C.blue},
-        {label:'Rebounds',vals:pg.map(g=>g.playerStats[playerLabel].reb||0),  fmt:v=>v,            color:C.green},
-        {label:'+/−',     vals:pg.map(g=>g.playerStats[playerLabel].pm||0),   fmt:v=>(v>0?'+':'')+v, color:C.gold},
-        {label:'TS%',     vals:pg.map(g=>{ const v=g.playerStats[playerLabel].ts; return v!=null?parseFloat((v*100).toFixed(1)):0 }), fmt:v=>v+'%', color:C.maroon2},
+        {label:'Points',   vals:pg.map(g=>g.playerStats[playerLabel].pts||0), fmt:v=>v, color:C.orange},
+        {label:'Assists',  vals:pg.map(g=>g.playerStats[playerLabel].ast||0), fmt:v=>v, color:C.blue},
+        {label:'Rebounds', vals:pg.map(g=>g.playerStats[playerLabel].reb||0), fmt:v=>v, color:C.green},
+        {label:'+/−',      vals:pg.map(g=>g.playerStats[playerLabel].pm||0),  fmt:v=>(v>0?'+':'')+v, color:C.gold},
+        {label:'TS%',      vals:pg.map(g=>{ const v=g.playerStats[playerLabel].ts; return v!=null?parseFloat((v*100).toFixed(1)):0 }), fmt:v=>v+'%', color:C.maroon2},
       ]
     }
   }
 
   if (loading) return (
-    <div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',color:C.orange2,fontFamily:'Georgia,serif',fontSize:'14px',letterSpacing:'4px'}}>
-      LOADING...
-    </div>
+    <div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',color:C.orange2,fontFamily:'Georgia,serif',fontSize:'14px',letterSpacing:'4px'}}>LOADING...</div>
   )
 
   const teamName = teams.find(t=>t.id===selectedTeam)?.name?.toUpperCase() || 'MY TEAM'
@@ -627,7 +574,7 @@ export default function CoachDashboard({ profile }) {
   return (
     <div style={{minHeight:'100vh',background:C.bg,fontFamily:'Georgia,serif',color:C.text}}>
 
-      {/* ── NAV ── */}
+      {/* NAV */}
       <div style={{height:'56px',display:'flex',alignItems:'center',gap:'12px',padding:'0 20px',background:'rgba(10,10,15,0.97)',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:200}}>
         <span style={{fontSize:'18px',fontWeight:'900',letterSpacing:'6px',color:C.orange2}}>SWIVEL</span>
         <div style={{width:'1px',height:'24px',background:C.border2}}/>
@@ -639,14 +586,14 @@ export default function CoachDashboard({ profile }) {
         <button onClick={()=>supabase.auth.signOut()} style={{padding:'5px 12px',background:'transparent',border:`1px solid ${C.border2}`,borderRadius:'6px',color:C.muted,fontSize:'11px',cursor:'pointer',fontFamily:'Georgia,serif'}}>Sign out</button>
       </div>
 
-      {/* ── TABS ── */}
+      {/* TABS */}
       <div style={{display:'flex',gap:'2px',padding:'0 20px',borderBottom:`1px solid ${C.border}`,background:'rgba(10,10,15,0.6)'}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{background:activeTab===t.id?C.maroon:'none',border:'none',borderBottom:activeTab===t.id?`2px solid ${C.orange}`:'2px solid transparent',color:activeTab===t.id?C.orange2:C.muted,fontFamily:'Georgia,serif',fontSize:'10px',fontWeight:'700',letterSpacing:'2px',padding:'12px 16px',cursor:'pointer',textTransform:'uppercase',transition:'all 0.15s'}}>{t.lbl}</button>
         ))}
       </div>
 
-      {/* ── GAME FILTER (all tabs) ── */}
+      {/* GAME FILTER */}
       <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px 20px',borderBottom:`1px solid ${C.border}`,background:'rgba(10,10,15,0.4)',flexWrap:'wrap'}}>
         <div style={{fontSize:'9px',letterSpacing:'3px',color:C.muted,textTransform:'uppercase'}}>Game</div>
         <select value={selectedGame} onChange={e=>setSelectedGame(e.target.value)} style={{background:C.panel,border:`1px solid ${C.border2}`,borderRadius:'6px',color:C.cream,fontFamily:'Georgia,serif',fontSize:'12px',padding:'6px 10px',outline:'none'}}>
@@ -657,10 +604,9 @@ export default function CoachDashboard({ profile }) {
 
       <div style={{padding:'20px'}}>
 
-        {/* ════════════ DASHBOARD TAB ════════════ */}
+        {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div>
-            {/* Season header */}
             <div style={{background:'linear-gradient(135deg,rgba(123,16,32,0.4) 0%,rgba(16,16,24,0.95) 60%)',border:`1px solid rgba(232,130,10,0.22)`,borderLeft:`4px solid ${C.orange}`,borderRadius:'10px',padding:'22px 28px',marginBottom:'20px',display:'flex',gap:'32px',flexWrap:'wrap',alignItems:'center',position:'relative',overflow:'hidden'}}>
               <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 50% 120% at 0% 50%,rgba(123,16,32,0.15) 0%,transparent 60%)',pointerEvents:'none'}}/>
               <div><div style={{fontSize:'9px',letterSpacing:'5px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'6px'}}>Team</div><div style={{fontSize:'28px',fontWeight:'900',color:C.cream,letterSpacing:'3px'}}>{teamName}</div></div>
@@ -671,8 +617,6 @@ export default function CoachDashboard({ profile }) {
               <div style={{width:'1px',height:'48px',background:'rgba(255,255,255,0.08)'}}/>
               <div><div style={{fontSize:'9px',letterSpacing:'5px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'6px'}}>Players</div><div style={{fontSize:'36px',fontWeight:'900',color:C.cream}}>{players.length}</div></div>
             </div>
-
-            {/* Box score sub-tabs */}
             <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'20px',marginBottom:'20px',overflowX:'auto'}}>
               <div style={{display:'flex',gap:'0',borderBottom:`1px solid ${C.border}`,marginBottom:'14px',flexWrap:'wrap'}}>
                 {['gamestats','shooting','totals'].map(t=>(
@@ -682,15 +626,13 @@ export default function CoachDashboard({ profile }) {
                 ))}
               </div>
               {sortedPlayers.length === 0
-                ? <div style={{textAlign:'center',color:C.muted,padding:'40px',fontSize:'13px',letterSpacing:'2px'}}>No players on roster yet — add players in the admin tagging tool</div>
+                ? <div style={{textAlign:'center',color:C.muted,padding:'40px',fontSize:'13px',letterSpacing:'2px'}}>No players on roster yet</div>
                 : <>
                     {renderBstTable(BST_COLS[activeBstTab==='shooting'?'shooting':activeBstTab]||BST_COLS.gamestats)}
                     {activeBstTab==='shooting' && <div style={{marginTop:'16px'}}>{renderBstTable(BST_COLS.shooting2)}</div>}
                   </>
               }
             </div>
-
-            {/* Impact charts */}
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:'14px'}}>
               {impactCharts.map(chart=>(
                 <div key={chart.id} style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'18px'}}>
@@ -702,19 +644,16 @@ export default function CoachDashboard({ profile }) {
           </div>
         )}
 
-        {/* ════════════ FILM TAB ════════════ */}
+        {/* FILM */}
         {activeTab === 'film' && (
           <div style={{display:'flex',gap:'14px',alignItems:'flex-start'}}>
-            {/* Video */}
             <div style={{flex:1,minWidth:0,maxWidth:'calc(100% - 330px)'}}>
-              {!videoLoaded
-                ? <div style={{background:C.panel,border:`2px dashed rgba(123,16,32,0.5)`,borderRadius:'10px',padding:'48px',textAlign:'center',cursor:'pointer'}} onClick={()=>document.getElementById('film-input').click()}>
-                    <div style={{fontSize:'36px',marginBottom:'12px'}}>🎬</div>
-                    <div style={{fontSize:'12px',color:C.muted,letterSpacing:'2px'}}>Load a game film to enable video playback</div>
-                    <div style={{fontSize:'10px',color:C.muted,marginTop:'8px',opacity:'0.6'}}>MP4 · any resolution</div>
-                  </div>
-                : null
-              }
+              {!videoLoaded && (
+                <div style={{background:C.panel,border:`2px dashed rgba(123,16,32,0.5)`,borderRadius:'10px',padding:'48px',textAlign:'center',cursor:'pointer'}} onClick={()=>document.getElementById('film-input').click()}>
+                  <div style={{fontSize:'36px',marginBottom:'12px'}}>🎬</div>
+                  <div style={{fontSize:'12px',color:C.muted,letterSpacing:'2px'}}>Load a game film to enable video playback</div>
+                </div>
+              )}
               <input id="film-input" type="file" accept="video/*" style={{display:'none'}} onChange={handleVideoFile}/>
               {videoURL && (
                 <div>
@@ -724,20 +663,12 @@ export default function CoachDashboard({ profile }) {
                     <select onChange={e=>{ if(videoRef.current) videoRef.current.playbackRate=parseFloat(e.target.value) }} style={{background:C.panel,border:`1px solid ${C.border2}`,borderRadius:'7px',color:C.cream,fontFamily:'Georgia,serif',fontSize:'10px',padding:'8px 10px',outline:'none'}}>
                       {[0.25,0.5,0.75,1,1.25,1.5,2].map(r=><option key={r} value={r}>{r}x</option>)}
                     </select>
-                    <select defaultValue="1" onChange={e=>{ if(videoRef.current) videoRef.current.playbackRate=parseFloat(e.target.value) }} style={{display:'none'}}/>
                   </div>
                 </div>
               )}
-              {!videoURL && (
-                <div style={{marginTop:'12px'}}>
-                  <button onClick={()=>document.getElementById('film-input').click()} style={{background:'rgba(232,130,10,0.12)',border:`1px solid rgba(232,130,10,0.35)`,borderRadius:'7px',color:C.orange2,fontFamily:'Georgia,serif',fontSize:'10px',padding:'8px 14px',cursor:'pointer',letterSpacing:'1px'}}>📂 Load Film</button>
-                </div>
-              )}
+              {!videoURL && <div style={{marginTop:'12px'}}><button onClick={()=>document.getElementById('film-input').click()} style={{background:'rgba(232,130,10,0.12)',border:`1px solid rgba(232,130,10,0.35)`,borderRadius:'7px',color:C.orange2,fontFamily:'Georgia,serif',fontSize:'10px',padding:'8px 14px',cursor:'pointer',letterSpacing:'1px'}}>📂 Load Film</button></div>}
             </div>
-
-            {/* Event list */}
             <div style={{width:'300px',flexShrink:0,display:'flex',flexDirection:'column',gap:'10px'}}>
-              {/* Filters */}
               <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'14px',display:'flex',flexDirection:'column',gap:'8px'}}>
                 <div style={{fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700'}}>Filters</div>
                 <select value={playerFilter} onChange={e=>setPlayerFilter(e.target.value)} style={{background:C.bg,border:`1px solid ${C.border2}`,borderRadius:'6px',color:C.cream,fontFamily:'Georgia,serif',fontSize:'11px',padding:'6px 8px',outline:'none'}}>
@@ -749,7 +680,6 @@ export default function CoachDashboard({ profile }) {
                   {[...new Set(statEvents.map(e=>e.stat))].filter(Boolean).map(s=><option key={s} value={s}>{STAT_LABELS[s]||s}</option>)}
                 </select>
               </div>
-              {/* Events */}
               <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',maxHeight:'500px',overflowY:'auto'}}>
                 <div style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',fontWeight:'700'}}>Events ({filmEvents.length})</div>
                 {filmEvents.length===0
@@ -757,7 +687,7 @@ export default function CoachDashboard({ profile }) {
                   : filmEvents.map((e,i)=>{
                       const player = players.find(p=>p.id===e.player_id)
                       return (
-                        <div key={i} onClick={()=>jumpTo(e.videoTime)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 14px',borderBottom:`1px solid rgba(255,255,255,0.04)`,cursor:'pointer',transition:'background 0.1s'}}
+                        <div key={i} onClick={()=>jumpTo(e.videoTime)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 14px',borderBottom:`1px solid rgba(255,255,255,0.04)`,cursor:'pointer'}}
                           onMouseEnter={el=>el.currentTarget.style.background='rgba(255,255,255,0.04)'}
                           onMouseLeave={el=>el.currentTarget.style.background='transparent'}>
                           <span style={{fontSize:'11px',color:C.muted,fontFamily:'Courier New',minWidth:'40px'}}>{fmt(e.videoTime)}</span>
@@ -772,7 +702,7 @@ export default function CoachDashboard({ profile }) {
           </div>
         )}
 
-        {/* ════════════ PLAYER CARDS TAB ════════════ */}
+        {/* PLAYER CARDS */}
         {activeTab === 'reports' && (
           <div>
             {sortedPlayers.length===0
@@ -821,28 +751,20 @@ export default function CoachDashboard({ profile }) {
           </div>
         )}
 
-        {/* ════════════ SEASON TAB ════════════ */}
+        {/* SEASON */}
         {activeTab === 'season' && (
           <div>
             {seasonGames.length===0
               ? <div style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'32px',textAlign:'center',color:C.muted,fontSize:'13px',letterSpacing:'2px'}}>No games yet</div>
               : <>
-                  {/* Season summary pills */}
                   <div style={{display:'flex',gap:'10px',marginBottom:'18px',flexWrap:'wrap'}}>
-                    {[
-                      {lbl:'Games',val:seasonGames.length},
-                      {lbl:'Record',val:`${wins}–${losses}`},
-                      {lbl:'Avg Pts For',val:(seasonGames.reduce((s,g)=>s+g.teamPts,0)/seasonGames.length).toFixed(1)},
-                      {lbl:'Avg Pts Ag', val:(seasonGames.reduce((s,g)=>s+(g.oppPts||0),0)/seasonGames.length).toFixed(1)},
-                    ].map(({lbl,val})=>(
+                    {[{lbl:'Games',val:seasonGames.length},{lbl:'Record',val:`${wins}–${losses}`},{lbl:'Avg Pts For',val:(seasonGames.reduce((s,g)=>s+g.teamPts,0)/seasonGames.length).toFixed(1)},{lbl:'Avg Pts Ag',val:(seasonGames.reduce((s,g)=>s+(g.oppPts||0),0)/seasonGames.length).toFixed(1)}].map(({lbl,val})=>(
                       <div key={lbl} style={{background:C.panel,border:`1px solid ${C.border2}`,borderRadius:'10px',padding:'12px 18px',textAlign:'center'}}>
                         <div style={{fontSize:'9px',letterSpacing:'3px',color:C.orange,textTransform:'uppercase',marginBottom:'4px'}}>{lbl}</div>
                         <div style={{fontSize:'22px',fontWeight:'900',color:C.cream}}>{val}</div>
                       </div>
                     ))}
                   </div>
-
-                  {/* Game log */}
                   <div style={{fontSize:'9px',letterSpacing:'4px',color:C.orange,textTransform:'uppercase',fontWeight:'700',marginBottom:'10px'}}>Game Log</div>
                   <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'28px'}}>
                     {[...seasonGames].reverse().map(g=>{
@@ -860,8 +782,6 @@ export default function CoachDashboard({ profile }) {
                       )
                     })}
                   </div>
-
-                  {/* Trends */}
                   {sortedSeasonGames.length >= 2 && (
                     <div>
                       <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'14px',flexWrap:'wrap'}}>
@@ -886,12 +806,7 @@ export default function CoachDashboard({ profile }) {
         )}
       </div>
 
-      {/* ── Toast ── */}
-      {toast && (
-        <div style={{position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',background:C.maroon,border:`1px solid ${C.orange}`,borderRadius:'8px',padding:'10px 20px',fontSize:'11px',letterSpacing:'3px',color:C.orange2,fontWeight:'700',textTransform:'uppercase',zIndex:500,pointerEvents:'none'}}>{toast}</div>
-      )}
-
-      {/* ── Post-game report modal ── */}
+      {toast && <div style={{position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',background:C.maroon,border:`1px solid ${C.orange}`,borderRadius:'8px',padding:'10px 20px',fontSize:'11px',letterSpacing:'3px',color:C.orange2,fontWeight:'700',textTransform:'uppercase',zIndex:500,pointerEvents:'none'}}>{toast}</div>}
       {reportGame && <PostGameReport game={reportGame} onClose={()=>setReportGame(null)}/>}
     </div>
   )
